@@ -22,6 +22,50 @@ struct ContentView: View {
 struct EventDetailSheetView: View {
     @Environment(\.dismiss) private var dismiss
     
+    @State private var liveTranscript: [TranscriptLine] = []
+    @State private var feedIndex: Int = 0
+    @State private var feedTimer: Timer? = nil
+    
+    struct TranscriptLine: Identifiable {
+        let id = UUID()
+        let speaker: String
+        let text: String
+    }
+    
+    // Pseudo "live" sample lines to feed into the UI
+    private let sampleTranscript: [TranscriptLine] = [
+        TranscriptLine(speaker: "ATC", text: "Delta 1008, La Guardia Tower, contact New York Departure."),
+        TranscriptLine(speaker: "DAL1008", text: "Over to Departure, Delta 1008. Good day."),
+        TranscriptLine(speaker: "Departure", text: "Delta 1008, radar contact. Climb and maintain three thousand."),
+        TranscriptLine(speaker: "DAL1008", text: "Climb and maintain three thousand, Delta 1008."),
+        TranscriptLine(speaker: "Departure", text: "Turn right heading two one zero, vectors JFK."),
+        TranscriptLine(speaker: "DAL1008", text: "Right two one zero, vectors JFK, Delta 1008."),
+        TranscriptLine(speaker: "Departure", text: "Maintain two one zero knots."),
+        TranscriptLine(speaker: "DAL1008", text: "Maintain two one zero knots, Delta 1008."),
+        TranscriptLine(speaker: "Departure", text: "Delta 1008, say souls on board and fuel remaining."),
+        TranscriptLine(speaker: "DAL1008", text: "One six three souls, fuel eight point five."),
+        TranscriptLine(speaker: "Departure", text: "Roger. Expect ILS runway two two left.")
+    ]
+
+    // Schedule the next pseudo-live line at a random 3–5s delay and loop forever.
+    private func scheduleNextFeed() {
+        feedTimer?.invalidate()
+        let delay = Double.random(in: 3.0...5.0)
+        feedTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
+            // Append next line
+            let line = sampleTranscript[feedIndex]
+            liveTranscript.append(line)
+            // Advance and wrap around to repeat forever
+            feedIndex = (feedIndex + 1) % sampleTranscript.count
+            // Optionally cap history to avoid unbounded growth (tweak as needed)
+            if liveTranscript.count > 300 {
+                liveTranscript.removeFirst(liveTranscript.count - 300)
+            }
+            // Chain the next event
+            scheduleNextFeed()
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -37,6 +81,17 @@ struct EventDetailSheetView: View {
                 )
                 .ignoresSafeArea()
                 
+                Rectangle()
+                    .foregroundStyle(
+                        Gradient(stops: [
+                            .init(color: .clear, location: 0.1),
+                            .init(color: Color(uiColor: .systemBackground).opacity(0.9), location: 0.7),
+                            
+                        ])
+                    )
+                    .ignoresSafeArea()
+                
+                
                 
                 VStack {
                     Spacer()
@@ -45,54 +100,145 @@ struct EventDetailSheetView: View {
                         .rotationEffect(.degrees(13))
                         .scaledToFit()
                         .padding()
-                    Spacer()
-                    VStack(alignment: .leading) {
-                        
+//                    Spacer()
+                    VStack(alignment: .leading, spacing: 0) {
                         // MARK: Transcription
-                        Text("Delta 1008, La Guardia tower, contact New York Departure")
-                            .font(.system(size: 32, weight: .semibold))
-                            .padding()
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 0) {
+                                    ForEach(liveTranscript) { line in
+                                        Text(line.speaker)
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .padding(.horizontal)
+                                            .padding(.bottom, 5)
+                                            .foregroundStyle(.primary.secondary)
+                                        Text(line.text)
+                                            .font(.system(size: 32, weight: .semibold))
+                                            .padding([.horizontal, .bottom])
+                                    }
+                                    Color.clear
+                                        .frame(height: 1)
+                                        .id("BOTTOM")
+                                }
+                            }
+                            .defaultScrollAnchor(.bottom)
+                            .onChange(of: liveTranscript.count) { _, _ in
+                                withAnimation(.easeOut(duration: 0.35)) {
+                                    proxy.scrollTo("BOTTOM", anchor: .bottom)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 240)
+                        .mask {
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0.0),   // hide at very top
+                                    .init(color: .white, location: 0.62),  // fade-in complete by 12%
+                                    .init(color: .white, location: 1.0)    // fully visible below
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
+                        .onAppear {
+                            // Show an initial line immediately so the UI never appears empty
+                            feedTimer?.invalidate()
+                            if !sampleTranscript.isEmpty {
+                                liveTranscript = [sampleTranscript[0]]
+                                feedIndex = 1 % sampleTranscript.count
+                            } else {
+                                liveTranscript = []
+                                feedIndex = 0
+                            }
+                            // Begin the randomized 3–5s feed loop
+                            scheduleNextFeed()
+                        }
+                        .onDisappear {
+                            feedTimer?.invalidate()
+                        }
+                        
+                        
                         
                         // MARK: Banner
-                        Rectangle()
-                            .frame(height: 47)
-                            .foregroundStyle(.incidentForeground)
-                        
+                        ZStack {
+                            Rectangle()
+                                .frame(height: 47)
+                                .foregroundStyle(.bannerIncidentBackground)
+                            HStack {
+                                Text("Delta Engine Failure")
+                                    .font(.system(.body, weight: .semibold))
+                                    .foregroundStyle(.bannerForeground)
+                                
+                                Spacer()
+                                
+                                Text("1d ago")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.bannerIncidentBackground)
+                                    .padding(5)
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 6)
+                                    }
+                            }
+                            .padding(.horizontal)
+                        }
                         
                         
                         // MARK: Radio
                         ZStack(alignment: .top) {
                             Rectangle()
-                                .foregroundStyle(.eventAccent)
-                            HStack {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .foregroundStyle(.black.opacity(0.13))
-                                    Image(systemName: "airplane")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .foregroundStyle(.eventForeground)
-                                        .padding(10)
-                                        .offset(x: 2) // TODO: A more permanent solution
-                                        .rotationEffect(.degrees(225))
+                                .foregroundStyle(.radioBackground)
+                            
+                            // MARK: Airport Info
+                            VStack {
+                                HStack {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .foregroundStyle(.black.opacity(0.13))
+                                        Image(systemName: "airplane")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .foregroundStyle(.radioForeground)
+                                            .padding(10)
+                                            .offset(x: 2) // TODO: A more permanent solution
+                                            .rotationEffect(.degrees(225))
+                                        
+                                    }
+                                    .frame(width: 45, height: 45)
+                                    VStack {
+                                        HStack(alignment: .top) {
+                                            Text("SFO")
+                                                .font(.system(size: 54, weight: .heavy, design: .rounded))
+                                                .foregroundStyle(.radioForeground)
+                                            
+                                            Text("San Francisco International Tower")
+                                                .bold()
+                                                .fontDesign(.rounded)
+                                                .foregroundStyle(.radioForeground)
+                                                .offset(y: 10)
+                                            
+                                        }
+                                        
+                                        
+                                    }
                                     
+                                    Spacer()
                                 }
-                                .frame(width: 45, height: 45)
-                                HStack(alignment: .top) {
-                                    Text("SFO")
-                                        .font(.system(size: 54, weight: .heavy, design: .rounded))
-                                        .foregroundStyle(.eventForeground)
-                                    
-                                    Text("San Francisco International Tower")
-                                        .bold()
-                                        .foregroundStyle(.eventForeground)
-                                        .offset(y: 10)
-                                    
-                                }
-                                Spacer()
+                                .frame(height: 45)
+                                .padding()
+                                
+                                // MARK: Audio Visualizer
+                                AudioVisualizerView(
+                                    barCount: 56,
+                                    height: 24,
+                                    verticalScale: 1.2,
+                                    spacing: 2
+                                )
+                                .foregroundStyle(.radioForeground)
+                                .padding(.bottom, 10)
                             }
-                            .frame(height: 45)
-                            .padding()
+                            
+                            
                         }
                         .frame(height: 141)
                     }
@@ -120,7 +266,6 @@ struct EventDetailSheetView: View {
                 
                 ToolbarItem(placement: .principal) {
                     Text("LIVE")
-                    
                         .font(.system(size: 14, weight: .bold))
                         .padding(.vertical, 3)
                         .padding(.horizontal, 6)
@@ -138,7 +283,8 @@ struct EventDetailSheetView: View {
             .foregroundStyle(
                 Gradient(stops: [
                     .init(color: Color(uiColor: .systemBackground).opacity(0.9), location: 0.1),
-                    .init(color: .clear, location: 0.3)
+                    .init(color: .clear, location: 0.3),
+                    
                 ])
             )
             .ignoresSafeArea()
@@ -155,12 +301,12 @@ struct EventDetailSheetView: View {
 //    var name: String
 //    var degrees: Double
 //
-//    
+//
 //    init (_ name: String, degrees: Double = 13) {
 //        self.name = name
 //        self.degrees = degrees
 //    }
-//    
+//
 //    var body: some View {
 //        ZStack {
 //            // Background
@@ -170,7 +316,7 @@ struct EventDetailSheetView: View {
 //                velocity: CGSize(width: -100, height: -50)
 //            )
 //            .ignoresSafeArea()
-//            
+//
 //            Image(name)
 //                .resizable()
 //                .rotationEffect(.degrees(self.degrees))
@@ -180,6 +326,37 @@ struct EventDetailSheetView: View {
 //    }
 //}
 
+struct GlassBar: View {
+    var height: CGFloat = 84   // how tall the blur zone is
+
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)        // Frosted blur
+            .frame(height: height)
+            .overlay {                        // Gloss highlight
+                LinearGradient(
+                    colors: [.white.opacity(0.35), .white.opacity(0.0)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                .blendMode(.plusLighter)
+            }
+            .overlay {                        // Soft rim
+                Rectangle()
+                    .stroke(.white.opacity(0.25), lineWidth: 0.75)
+                    .blur(radius: 0.5)
+            }
+            // Feather the glass so it fades out into clear content below
+            .mask {
+                LinearGradient(stops: [
+                    .init(color: .white, location: 0.0),
+                    .init(color: .white, location: 0.7),
+                    .init(color: .clear, location: 1.0)
+                ], startPoint: .top, endPoint: .bottom)
+            }
+            .compositingGroup()
+            .allowsHitTesting(false)
+    }
+}
 
 
 struct BackgroundGridPattern: View {
