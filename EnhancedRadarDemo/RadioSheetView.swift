@@ -1,5 +1,5 @@
 //
-//  EventDetailSheetView.swift
+//  RadioSheetView.swift
 //  EnhancedRadarDemo
 //
 //  Created by Yuhao Chen on 8/11/25.
@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-struct EventDetailSheetView: View {
+struct RadioSheetView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var liveTranscript: [TranscriptLine] = []
@@ -377,6 +377,6 @@ struct BackgroundGridPattern: View {
 #Preview {
     Text("Enhanced Radar")
         .sheet(isPresented: .constant(true)) {
-            EventDetailSheetView()
+            RadioSheetView()
         }
 }

@@ -7,8 +7,15 @@
 
 import SwiftUI
 
+@Observable
+class ContentViewModel {
+    var showRadioView = false
+    var showAirportDetailView = false
+}
+
+
 struct ContentView: View {
-    @State var showEventDetailView = false
+    @State var showAirportDetailView = false
     
     var body: some View {
         NavigationStack {
@@ -22,7 +29,10 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ) {
+                        showAirportDetailView = true
+                    }
+                    
                     AirportCardView(
                         code: "EWR",
                         airportName: "Newark Liberty Int'l",
@@ -31,7 +41,10 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ){
+                        showAirportDetailView = true
+                    }
+                    
                     AirportCardView(
                         code: "MIA",
                         airportName: "Miami Int'l",
@@ -40,7 +53,10 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ){
+                        showAirportDetailView = true
+                    }
+                    
                     AirportCardView(
                         code: "ATL",
                         airportName: "Atlanta Int'l",
@@ -49,7 +65,10 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ) {
+                        showAirportDetailView = true
+                    }
+                    
                     AirportCardView(
                         code: "EWR",
                         airportName: "Newark Liberty Int'l",
@@ -58,7 +77,10 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ) {
+                        showAirportDetailView = true
+                    }
+                    
                     AirportCardView(
                         code: "MIA",
                         airportName: "Miami Int'l",
@@ -67,7 +89,9 @@ struct ContentView: View {
                         weatherSymbol: "cloud.heavyrain.fill",
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
-                    )
+                    ) {
+                        showAirportDetailView = true
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top)
@@ -76,8 +100,8 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
                     
         }
-        .sheet(isPresented: $showEventDetailView) {
-            EventDetailSheetView()
+        .sheet(isPresented: $showAirportDetailView) {
+            AirportDetailSheetView()
         }
     }
 }

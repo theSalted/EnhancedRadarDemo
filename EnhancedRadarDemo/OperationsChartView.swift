@@ -45,7 +45,7 @@ struct OperationsChartView: View {
                     BarMark(
                         x: .value("time", shape.time),
                         y: .value("count", shape.count),
-                        width: .fixed(28)
+                        width: .fixed(23)
                     )
                     .cornerRadius(4)
                     .foregroundStyle(.background.tertiary)
@@ -70,7 +70,7 @@ struct OperationsChartView: View {
                     BarMark(
                         x: .value("time", shape.time),
                         y: .value("count", shape.count),
-                        width: .fixed(28)
+                        width: .fixed(23)
                     )
                     .cornerRadius(4)
                     .foregroundStyle(.bannerIncidentBackground)

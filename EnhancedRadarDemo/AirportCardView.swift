@@ -16,79 +16,96 @@ struct AirportCardView: View {
     let weatherSymbol: String
     let weatherText: String
     let viewCount: String
+    let action: () -> Void 
+    
+    init(code: String, airportName: String, statusSymbol: String, statusText: String, weatherSymbol: String, weatherText: String, viewCount: String, _ action: @escaping () -> Void = {}) {
+        self.code = code
+        self.airportName = airportName
+        self.statusSymbol = statusSymbol
+        self.statusText = statusText
+        self.weatherSymbol = weatherSymbol
+        self.weatherText = weatherText
+        self.viewCount = viewCount
+        self.action = action
+    }
 
     var body: some View {
-        VStack {
-            HStack {
-                HStack(alignment: .lastTextBaseline) {
-                    Text(code)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text(airportName)
-                        .foregroundStyle(.primary.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+        Button {
+            action()
+        } label: {
+            VStack {
+                HStack {
+                    HStack(alignment: .lastTextBaseline) {
+                        Text(code)
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(airportName)
+                            .foregroundStyle(.primary.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "eye.fill")
+                        Text(viewCount)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.viewCounterForeground)
+                    .padding(5)
+                    .padding(.horizontal, 2)
+                    .background {
+                        RoundedRectangle(cornerRadius: 6)
+                            .foregroundStyle(.viewCounterBackground)
+                    }
                 }
                 
-                Spacer()
                 
-                HStack(spacing: 6) {
-                    Image(systemName: "eye.fill")
-                    Text(viewCount)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.viewCounterForeground)
-                .padding(5)
-                .padding(.horizontal, 2)
-                .background {
-                    RoundedRectangle(cornerRadius: 6)
-                        .foregroundStyle(.viewCounterBackground)
+                // Business + Weather (fixed column widths)
+                HStack(spacing: 12) {
+                    // Left column (status)
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: statusSymbol)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30, alignment: .center)
+
+                        Text(statusText)
+                            .foregroundStyle(.primary.secondary)
+                            .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 30, alignment: .center)
+
+                    // Right column (weather)
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: weatherSymbol)
+                            .symbolRenderingMode(.multicolor)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30, alignment: .center)
+
+                        Text(weatherText)
+                            .foregroundStyle(.primary.secondary)
+                            .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(minHeight: 30, alignment: .center)
                 }
             }
-            
-            
-            // Business + Weather (fixed column widths)
-            HStack(spacing: 12) {
-                // Left column (status)
-                HStack(alignment: .center, spacing: 10) {
-                    Image(systemName: statusSymbol)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30, alignment: .center)
-
-                    Text(statusText)
-                        .foregroundStyle(.primary.secondary)
-                        .font(.system(size: 13))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: 30, alignment: .center)
-
-                // Right column (weather)
-                HStack(alignment: .center, spacing: 10) {
-                    Image(systemName: weatherSymbol)
-                        .symbolRenderingMode(.multicolor)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30, alignment: .center)
-
-                    Text(weatherText)
-                        .foregroundStyle(.primary.secondary)
-                        .font(.system(size: 13))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .frame(minHeight: 30, alignment: .center)
+            .padding()
+            .background {
+                RoundedRectangle(cornerRadius: 16)
+                    .foregroundStyle(.background.secondary)
             }
         }
-        .padding()
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .foregroundStyle(.background.secondary)
-        }
+        .buttonStyle(.plain)
     }
 }
 
