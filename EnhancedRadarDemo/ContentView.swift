@@ -8,12 +8,30 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State var showEventDetailView = false
+    
     var body: some View {
-        VStack {
-            Image(systemName: "airplane")
-            Text("Enhanced Radar")
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(0..<40) { i in
+                        VStack {
+                            HStack {
+                                Text("SFO")
+                                Text("San Francisco Int'l")
+                                
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top)
+            }
+            .navigationTitle("Items")
+            .navigationBarTitleDisplayMode(.large)
+                    
         }
-        .sheet(isPresented: .constant(true)) {
+        .sheet(isPresented: $showEventDetailView) {
             EventDetailSheetView()
         }
     }
