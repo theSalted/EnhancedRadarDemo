@@ -15,11 +15,6 @@ struct AirportDetailSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                #if DEBUG && targetEnvironment(simulator) && canImport(SwiftUI)
-                simulatorStyleFix
-                #endif
-                
-                
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         HStack(spacing: 15) {
@@ -94,12 +89,6 @@ struct AirportDetailSheetView: View {
                 RadioSheetView()
             }
         }
-    }
-    
-    #warning("DELETEME: Afer upgrade xcode version  ")
-    var simulatorStyleFix: some View {
-        Rectangle().foregroundStyle(.background)
-            .ignoresSafeArea()
     }
 }
 
