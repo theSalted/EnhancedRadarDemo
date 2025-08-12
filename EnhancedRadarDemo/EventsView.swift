@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct EventsView: View {
-    @State var showAirportDetailView = false
+    @State var showRadioView = false
     
     @State private var scrollProperties: ScrollGeometry = .init(
         contentOffset: .zero,
@@ -23,7 +23,7 @@ struct EventsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Button {
-                    showAirportDetailView = true
+                    showRadioView = true
                 } label: {
                     ZStack {
                         
@@ -36,11 +36,8 @@ struct EventsView: View {
                         Image("DeltaPlane")
                             .resizable()
                             .scaledToFit()
-                            .frame(height: 400)
-                            .mask {
-                                Rectangle()
-                            }
                             .padding(.horizontal)
+                            .frame(maxHeight: 400)
                             .opacity(1 - scrollProperties.featureTriggerProgress)
                         
                         Rectangle()
@@ -77,7 +74,7 @@ struct EventsView: View {
                             )
                         
                         VStack(alignment: .leading, spacing: 10) {
-                            Spacer(minLength: 300)
+                            Spacer()
                             
                             Text("Small plane skids of runway and into Lake Washington")
                                 .font(.title3)
@@ -107,30 +104,43 @@ struct EventsView: View {
                                 Text("B737")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
-                                Image("planeSymbolName")
+                                Image("B737Symbol")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(height: 22)
                                     .padding(.leading, 4)
+                                    .opacity(scrollProperties.featureTriggerProgress)
                                 Spacer()
                             }
                         }
+                        .frame(height: 400)
                         .padding()
                     }
                 }
+                .frame(height: 425)
                 .padding(.horizontal, 15 * scrollProperties.featureTriggerProgress)
                 .buttonStyle(.plain)
                 
                 Group {
-                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol")
+                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        showRadioView = true
+                    }
                     
-                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol")
+                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        showRadioView = true
+                    }
                     
-                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol")
+                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        showRadioView = true
+                    }
                     
-                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol")
+                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        showRadioView = true
+                    }
                     
-                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol")
+                    EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        showRadioView = true
+                    }
                 }
                     .padding(.horizontal)
             }
@@ -143,8 +153,8 @@ struct EventsView: View {
         .ignoresSafeArea()
         .navigationTitle("Trending")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $showAirportDetailView) {
-            AirportDetailSheetView()
+        .sheet(isPresented: $showRadioView) {
+            RadioSheetView()
         }
     }
 }

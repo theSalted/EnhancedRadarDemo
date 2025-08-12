@@ -37,7 +37,7 @@ struct AirportsView: View {
                         Image("SFOTower")
                             .resizable()
                             .scaledToFit()
-                            .frame(height: 400)
+                            .frame(maxHeight: 400)
                             .offset(x: 50, y: 30)
                             .mask {
                                 Rectangle()
@@ -79,7 +79,7 @@ struct AirportsView: View {
                             )
                         
                         VStack {
-                            Spacer(minLength: 300)
+                            Spacer()
                             HStack {
                                 HStack(alignment: .lastTextBaseline) {
                                     Text("SFO")
@@ -147,6 +147,7 @@ struct AirportsView: View {
                         .padding()
                     }
                 }
+                .frame(height: 425)
                 .padding(.horizontal, 15 * scrollProperties.featureTriggerProgress)
                 .buttonStyle(.plain)
                 

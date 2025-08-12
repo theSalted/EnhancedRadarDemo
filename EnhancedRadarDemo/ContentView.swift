@@ -16,8 +16,16 @@ class ContentViewModel {
 
 struct ContentView: View {
     var body: some View {
-        NavigationStack {
-            AirportsView()
+        TabView {
+            NavigationStack {
+                AirportsView()
+            }
+            .tabItem { Label("Airports", systemImage: "airplane.up.right.app.fill") }
+            
+            NavigationStack {
+                EventsView()
+            }
+            .tabItem { Label("Trending", systemImage: "chart.line.uptrend.xyaxis") }
         }
     }
 }
