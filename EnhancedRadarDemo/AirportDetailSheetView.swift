@@ -29,6 +29,7 @@ struct AirportDetailSheetView: View {
                                 .scaledToFit()
                             VStack(alignment: .leading){
                                 Text("Airport Weather")
+                                    .foregroundStyle(Color(uiColor: UIColor.label))
                                     .font(.system(size: 18, weight: .medium))
                                 Text("84° and scattered clouds")
                                     .font(.caption)
@@ -40,31 +41,18 @@ struct AirportDetailSheetView: View {
                         }
                         .frame(height: 40)
                         .padding()
-                        .background {
-                            // TODO: Try use liquid glass
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(lineWidth: 1)
-                                .foregroundStyle(.foreground.tertiary)
-                            
-                        }
-                        
-                        
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
                         
                         VStack(alignment: .leading) {
                             Text("Operations")
+                                .foregroundStyle(Color(uiColor: UIColor.label))
                                 .font(.headline)
                                 .bold()
                             OperationsChartView()
                         }
                         .frame(height: 140)
                         .padding()
-                        .background {
-                            // TODO: Try use liquid glass
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(lineWidth: 1)
-                                .foregroundStyle(.foreground.tertiary)
-                            
-                        }
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
                         .padding(.bottom)
                         
                         Text("Start Listening")
