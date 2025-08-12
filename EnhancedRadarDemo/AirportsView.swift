@@ -63,7 +63,7 @@ struct AirportsView: View {
                             }
                             .scaleEffect(1.1)
                             .mask {
-                                RoundedRectangle(cornerRadius: 20 * scrollProperties.featureTriggerProgress)
+                                RoundedRectangle(cornerRadius: 16 * scrollProperties.featureTriggerProgress)
                             }
                             .opacity(1 * scrollProperties.featureTriggerProgress)
                         

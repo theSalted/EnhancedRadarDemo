@@ -15,8 +15,6 @@ class ContentViewModel {
 
 
 struct ContentView: View {
-    
-    
     var body: some View {
         NavigationStack {
             AirportsView()
