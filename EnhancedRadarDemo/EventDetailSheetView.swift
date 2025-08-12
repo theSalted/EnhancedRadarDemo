@@ -371,3 +371,11 @@ struct BackgroundGridPattern: View {
         }
     }
 }
+
+
+#Preview {
+    Text("Enhanced Radar")
+        .sheet(isPresented: .constant(true)) {
+            EventDetailSheetView()
+        }
+}

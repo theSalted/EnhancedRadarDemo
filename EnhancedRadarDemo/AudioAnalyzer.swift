@@ -188,8 +188,6 @@ final class AudioAnalyzer: ObservableObject {
                 [0.4, 0.7, 0.9, 0.7, 0.4],
                 // Double peak
                 [0.6, 0.9, 0.6, 0.3, 0.6, 0.9, 0.6],
-                // Steady signal
-                [0.7, 0.7, 0.7, 0.7, 0.7],
                 // Wave
                 [0.3, 0.5, 0.7, 0.9, 0.8, 0.6, 0.4, 0.2],
                 // Radio chatter
@@ -350,39 +348,68 @@ struct AudioVisualizerView: View {
                 let shapes = ["bell", "wave", "double_peak", "burst"] // Restored wave pattern
                 let shape = shapes.randomElement() ?? "bell"
                 let clusterSize = Int.random(in: 9...15) // Even wider clusters
-                
+
+                // Precompute parameters for shapes that need consistency across the cluster
+                let multiWavePartials: [(freq: CGFloat, amp: CGFloat, phase: CGFloat)] = [
+                    (1.0, 1.0, CGFloat.random(in: 0...(2 * .pi))),   // fundamental
+                    (2.0, 0.45, CGFloat.random(in: 0...(2 * .pi))),  // 2nd harmonic
+                    (3.0, 0.25, CGFloat.random(in: 0...(2 * .pi)))   // 3rd harmonic
+                ]
+                let amDepth: CGFloat = CGFloat.random(in: 0.05...0.22)  // amplitude modulation depth
+                let amFreq:  CGFloat = CGFloat.random(in: 0.4...1.4)    // amplitude modulation frequency (cycles across cluster)
+                let envSharpness: CGFloat = CGFloat.random(in: 3.0...5.0) // controls attack/decay envelope sharpness
+
                 for i in 0..<clusterSize {
                     let xOffset = CGFloat(i) * 5.0 // More spacing between bars
                     let progress = CGFloat(i) / CGFloat(clusterSize - 1) // 0 to 1
-                    
+
                     var heightMultiplier: CGFloat = 1.0
-                    
+
                     switch shape {
                     case "bell":
                         // Bell curve - high in middle, low at edges
                         let bellValue = exp(-pow((progress - 0.5) * 4, 2))
                         heightMultiplier = 0.4 + bellValue * 0.8 // Taller
-                        
+
                     case "wave":
-                        // Sine wave
-                        heightMultiplier = 0.5 + 0.7 * sin(progress * .pi * 2) // Taller
-                        
+                        // Composite of multiple partials + gentle amplitude modulation and bell envelope
+                        let sumAmp = multiWavePartials.reduce(0) { $0 + $1.amp }
+                        let composite = multiWavePartials.reduce(CGFloat(0)) { acc, p in
+                            acc + p.amp * sin(progress * .pi * 2 * p.freq + p.phase)
+                        }
+                        // Normalize sum of sines (from [-sumAmp, +sumAmp]) to [0, 1]
+                        var normalized = (composite / max(0.0001, sumAmp) + 1) * 0.5
+
+                        // Bell-like envelope for natural attack/decay across the cluster width
+                        let envelope = exp(-pow((progress - 0.5) * envSharpness, 2))
+
+                        // Light amplitude modulation to avoid a static look
+                        let am = 1 + amDepth * sin(progress * .pi * 2 * amFreq)
+
+                        normalized = normalized * (0.55 + 0.45 * envelope) * am
+
+                        // Sprinkle a touch of noise
+                        normalized += CGFloat.random(in: -0.03...0.03)
+
+                        // Clamp and assign
+                        heightMultiplier = max(0.0, min(1.4, normalized))
+
                     case "double_peak":
                         // Two peaks
                         let peak1 = exp(-pow((progress - 0.25) * 6, 2))
                         let peak2 = exp(-pow((progress - 0.75) * 6, 2))
                         heightMultiplier = 0.3 + max(peak1, peak2) * 0.9 // Taller
-                        
+
                     case "burst":
                         // Random spiky burst
                         let basePattern = exp(-pow((progress - 0.5) * 3, 2))
                         let spike = CGFloat.random(in: 0.8...1.4) // Taller spikes
                         heightMultiplier = basePattern * spike
-                        
+
                     default:
                         heightMultiplier = CGFloat.random(in: 0.7...1.5) // Taller default
                     }
-                    
+
                     let clusterBar = (
                         x: startX + xOffset,
                         height: baseHeight * heightMultiplier,
@@ -424,11 +451,11 @@ struct AudioVisualizerView: View {
                 }
             }
         }
-        .onAppear { 
+        .onAppear {
             analyzer.start()
             scrollingBars = []
         }
-        .onDisappear { 
+        .onDisappear {
             analyzer.stop()
         }
         .accessibilityHidden(true)

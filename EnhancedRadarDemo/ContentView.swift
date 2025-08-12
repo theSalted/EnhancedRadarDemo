@@ -13,21 +13,66 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(0..<40) { i in
-                        VStack {
-                            HStack {
-                                Text("SFO")
-                                Text("San Francisco Int'l")
-                                
-                            }
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 20) {
+                    AirportCardView(
+                        code: "SFO",
+                        airportName: "San Francisco Int’l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "About as busy as it gets",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
+                    AirportCardView(
+                        code: "EWR",
+                        airportName: "Newark Liberty Int'l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "Moderately busy",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
+                    AirportCardView(
+                        code: "MIA",
+                        airportName: "Miami Int'l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "Moderately busy",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
+                    AirportCardView(
+                        code: "ATL",
+                        airportName: "Atlanta Int'l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "Moderately busy",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
+                    AirportCardView(
+                        code: "EWR",
+                        airportName: "Newark Liberty Int'l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "Moderately busy",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
+                    AirportCardView(
+                        code: "MIA",
+                        airportName: "Miami Int'l",
+                        statusSymbol: "gauge.open.with.lines.needle.33percent",
+                        statusText: "Moderately busy",
+                        weatherSymbol: "cloud.heavyrain.fill",
+                        weatherText: "84° and raining with gusty winds",
+                        viewCount: "13.4k"
+                    )
                 }
                 .padding(.horizontal)
                 .padding(.top)
             }
-            .navigationTitle("Items")
+            .navigationTitle("Airports")
             .navigationBarTitleDisplayMode(.large)
                     
         }
