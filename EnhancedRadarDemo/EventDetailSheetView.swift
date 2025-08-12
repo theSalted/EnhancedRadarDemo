@@ -279,6 +279,7 @@ struct EventDetailSheetView: View {
             .ignoresSafeArea()
     }
     
+    #warning("DELETEME: Afer upgrade xcode version  ")
     var simulatorStyleFix: some View {
         // A quick hack for a SwiftUI bug that make sheet stuck in light mode
         Rectangle().foregroundStyle(.background)
