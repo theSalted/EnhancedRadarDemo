@@ -17,9 +17,22 @@ struct InfiniteGridView: View {
     var lineWidth: CGFloat = 0.5
     var majorLineWidth: CGFloat = 1
     
+    // Velocity properties (points per second)
+    var velocityX: CGFloat = 0
+    var velocityY: CGFloat = 0
+    
     var body: some View {
-        TransparentSceneView(scene: createGridScene())
-            .ignoresSafeArea()
+        TransparentSceneView(
+            spacing: spacing,
+            majorEvery: majorEvery,
+            color: color,
+            majorColor: majorColor,
+            lineWidth: lineWidth,
+            majorLineWidth: majorLineWidth,
+            velocityX: velocityX,
+            velocityY: velocityY
+        )
+        .ignoresSafeArea()
     }
     
     private func createGridScene() -> SCNScene {
@@ -30,6 +43,7 @@ struct InfiniteGridView: View {
         
         // Create grid geometry
         let gridNode = createGridNode()
+        gridNode.name = "gridNode"
         scene.rootNode.addChildNode(gridNode)
         
         // Set up camera
@@ -147,20 +161,174 @@ struct InfiniteGridView: View {
 }
 
 struct TransparentSceneView: UIViewRepresentable {
-    let scene: SCNScene
+    let spacing: CGFloat
+    let majorEvery: Int
+    let color: Color
+    let majorColor: Color
+    let lineWidth: CGFloat
+    let majorLineWidth: CGFloat
+    let velocityX: CGFloat
+    let velocityY: CGFloat
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
-        scnView.scene = scene
         scnView.allowsCameraControl = true
         scnView.backgroundColor = UIColor.clear
         scnView.isOpaque = false
         scnView.antialiasingMode = .multisampling4X
+        
+        // Additional settings to reduce flickering
+        scnView.preferredFramesPerSecond = 60
+        
+        // Create the scene once
+        let scene = createGridScene()
+        scnView.scene = scene
+        
         return scnView
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
-        uiView.scene = scene
+        // Recreate the scene when grid properties change
+        let newScene = createGridScene()
+        uiView.scene = newScene
+        
+        // Find the grid node and update its animation
+        if let gridNode = newScene.rootNode.childNode(withName: "gridNode", recursively: true) {
+            updateGridAnimation(gridNode: gridNode)
+        }
+    }
+    
+    private func updateGridAnimation(gridNode: SCNNode) {
+        gridNode.removeAllActions()
+        
+        if velocityX != 0 || velocityY != 0 {
+            // Calculate movement per second (convert velocity from points to SceneKit units)
+            let moveX = Float(velocityX) * 0.1 // Apply same scaling as our grid
+            let moveY = Float(velocityY) * 0.1
+            
+            // Create a 1-second move action
+            let moveAction = SCNAction.moveBy(x: CGFloat(moveX), y: CGFloat(moveY), z: 0, duration: 1.0)
+            
+            // Repeat forever
+            let infiniteAction = SCNAction.repeatForever(moveAction)
+            
+            gridNode.runAction(infiniteAction, forKey: "gridAnimation")
+        }
+    }
+    
+    private func createGridScene() -> SCNScene {
+        let scene = SCNScene()
+        
+        // Make scene background transparent
+        scene.background.contents = UIColor.clear
+        
+        // Create grid geometry
+        let gridNode = createGridNode()
+        gridNode.name = "gridNode"
+        scene.rootNode.addChildNode(gridNode)
+        
+        // Set up camera
+        let cameraNode = SCNNode()
+        cameraNode.camera = SCNCamera()
+        cameraNode.camera?.fieldOfView = 60
+        cameraNode.position = SCNVector3(0, 0, 10)
+        scene.rootNode.addChildNode(cameraNode)
+        
+        return scene
+    }
+    
+    private func createGridNode() -> SCNNode {
+        let gridNode = SCNNode()
+        
+        // Convert SwiftUI points to SceneKit units for accurate spacing
+        let pointToSceneKitScale: Float = 0.1
+        
+        // Grid dimensions - make it large enough to feel infinite
+        let gridSize: Float = 200
+        let step = Float(spacing) * pointToSceneKitScale
+        let majorStep = Int(majorEvery)
+        
+        // Create minor lines
+        let minorLines = createGridLines(
+            gridSize: gridSize,
+            step: step,
+            majorStep: majorStep,
+            isMajor: false
+        )
+        
+        // Create major lines
+        let majorLines = createGridLines(
+            gridSize: gridSize,
+            step: step,
+            majorStep: majorStep,
+            isMajor: true
+        )
+        
+        gridNode.addChildNode(minorLines)
+        gridNode.addChildNode(majorLines)
+        
+        return gridNode
+    }
+    
+    private func createGridLines(gridSize: Float, step: Float, majorStep: Int, isMajor: Bool) -> SCNNode {
+        let linesNode = SCNNode()
+        
+        let halfSize = gridSize / 2
+        let numLines = Int(gridSize / step)
+        
+        // Calculate line thickness based on line width parameters
+        let actualLineWidth = isMajor ? Float(majorLineWidth) : Float(lineWidth)
+        let cylinderRadius = actualLineWidth * 0.05 // Convert points to SceneKit radius
+        
+        // Create material once for all lines
+        let material = SCNMaterial()
+        let lineColor = isMajor ? majorColor : color
+        material.diffuse.contents = UIColor(lineColor)
+        material.lightingModel = .constant
+        material.isDoubleSided = true
+        material.transparency = 1.0
+        
+        // Create vertical lines centered around origin
+        let startIndex = -numLines/2
+        let endIndex = numLines/2
+        
+        for i in startIndex...endIndex {
+            let shouldDraw = isMajor ? (i % majorStep == 0) : (i % majorStep != 0)
+            guard shouldDraw else { continue }
+            
+            let x = Float(i) * step
+            
+            // Create vertical cylinder line
+            let verticalCylinder = SCNCylinder(radius: CGFloat(cylinderRadius), height: CGFloat(gridSize))
+            verticalCylinder.materials = [material]
+            
+            let verticalNode = SCNNode(geometry: verticalCylinder)
+            verticalNode.position = SCNVector3(x, 0, 0)
+            // Cylinder is already vertical by default
+            
+            linesNode.addChildNode(verticalNode)
+        }
+        
+        // Create horizontal lines centered around origin
+        for i in startIndex...endIndex {
+            let shouldDraw = isMajor ? (i % majorStep == 0) : (i % majorStep != 0)
+            guard shouldDraw else { continue }
+            
+            let y = Float(i) * step
+            
+            // Create horizontal cylinder line
+            let horizontalCylinder = SCNCylinder(radius: CGFloat(cylinderRadius), height: CGFloat(gridSize))
+            horizontalCylinder.materials = [material]
+            
+            let horizontalNode = SCNNode(geometry: horizontalCylinder)
+            horizontalNode.position = SCNVector3(0, y, 0)
+            // Rotate 90 degrees around Z axis to make it horizontal
+            horizontalNode.eulerAngles = SCNVector3(0, 0, Float.pi / 2)
+            
+            linesNode.addChildNode(horizontalNode)
+        }
+        
+        return linesNode
     }
 }
 
@@ -172,6 +340,8 @@ struct TransparentSceneView: UIViewRepresentable {
         @State private var majorLineWidth: CGFloat = 1.0
         @State private var colorOpacity: Double = 1
         @State private var majorColorOpacity: Double = 1
+        @State private var velocityX: CGFloat = 0
+        @State private var velocityY: CGFloat = 0
         
         var body: some View {
             VStack {
@@ -189,7 +359,9 @@ struct TransparentSceneView: UIViewRepresentable {
                         color: .white.opacity(colorOpacity),
                         majorColor: .red.opacity(majorColorOpacity),
                         lineWidth: lineWidth,
-                        majorLineWidth: majorLineWidth
+                        majorLineWidth: majorLineWidth,
+                        velocityX: velocityX,
+                        velocityY: velocityY
                     )
                 }
                 
@@ -225,6 +397,16 @@ struct TransparentSceneView: UIViewRepresentable {
                     HStack {
                         Text("Major Color Opacity: \(majorColorOpacity, specifier: "%.2f")")
                         Slider(value: $majorColorOpacity, in: 0.0...1.0, step: 0.01)
+                    }
+                    
+                    HStack {
+                        Text("Velocity X: \(Int(velocityX))pt/s")
+                        Slider(value: $velocityX, in: -100...100, step: 5)
+                    }
+                    
+                    HStack {
+                        Text("Velocity Y: \(Int(velocityY))pt/s")
+                        Slider(value: $velocityY, in: -100...100, step: 5)
                     }
                 }
                 .padding()
