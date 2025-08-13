@@ -12,7 +12,9 @@ import OSLog
 struct RadioSheetView: View {
     @Environment(\.dismiss) private var dismiss
     
-    @State private var liveTranscript: [TranscriptLine] = []
+    @State private var liveTranscript: [TranscriptLine] = [
+        TranscriptLine(speaker: "ATC", text: "Delta 1008, La Guardia Tower, contact New York Departure.")
+    ]
     @State private var feedIndex: Int = 0
     @State private var feedTimer: Timer? = nil
     
@@ -42,17 +44,22 @@ struct RadioSheetView: View {
         feedTimer?.invalidate()
         let delay = Double.random(in: 3.0...5.0)
         feedTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
-            // Append next line
-            let line = sampleTranscript[feedIndex]
-            liveTranscript.append(line)
-            // Advance and wrap around to repeat forever
-            feedIndex = (feedIndex + 1) % sampleTranscript.count
-            // Optionally cap history to avoid unbounded growth (tweak as needed)
-            if liveTranscript.count > 300 {
-                liveTranscript.removeFirst(liveTranscript.count - 300)
+            DispatchQueue.main.async {
+                // Append next line
+                let line = sampleTranscript[feedIndex]
+                liveTranscript.append(line)
+                
+                // Advance and wrap around to repeat forever
+                feedIndex = (feedIndex + 1) % sampleTranscript.count
+                
+                // Optionally cap history to avoid unbounded growth (tweak as needed)
+                if liveTranscript.count > 300 {
+                    liveTranscript.removeFirst(liveTranscript.count - 300)
+                }
+                
+                // Chain the next event
+                scheduleNextFeed()
             }
-            // Chain the next event
-            scheduleNextFeed()
         }
     }
     
@@ -130,9 +137,14 @@ struct RadioSheetView: View {
                                 }
                             }
                             .defaultScrollAnchor(.bottom)
-                            .onChange(of: liveTranscript.count) { _, _ in
+                            .onChange(of: liveTranscript.count) { oldCount, newCount in
                                 withAnimation(.easeOut(duration: 0.35)) {
                                     proxy.scrollTo("BOTTOM", anchor: .bottom)
+                                }
+                                
+                                // Light haptic for new transcript (skip initial load)
+                                if oldCount > 0 && newCount > oldCount {
+                                    HapticService.shared.light()
                                 }
                             }
                         }
@@ -152,14 +164,6 @@ struct RadioSheetView: View {
                         }
                         .onAppear {
                             // Show an initial line immediately so the UI never appears empty
-                            feedTimer?.invalidate()
-                            if !sampleTranscript.isEmpty {
-                                liveTranscript = [sampleTranscript[0]]
-                                feedIndex = 1 % sampleTranscript.count
-                            } else {
-                                liveTranscript = []
-                                feedIndex = 0
-                            }
                             // Begin the randomized 3–5s feed loop
                             scheduleNextFeed()
                         }
@@ -268,6 +272,7 @@ struct RadioSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        HapticService.shared.medium()
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")

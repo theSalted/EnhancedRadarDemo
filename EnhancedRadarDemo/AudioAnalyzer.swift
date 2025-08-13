@@ -40,6 +40,15 @@ final class AudioAnalyzer: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
 
+        // DISABLED: Skip microphone access to avoid interfering with haptics
+        // Always use fake animation for now - can be re-enabled when real audio streaming is added
+        self.fakeIdleAnimation()
+        
+        // TODO: Re-enable real audio when needed:
+        // - Remove the line above
+        // - Uncomment the microphone permission code below
+        
+        /*
         // Avoid touching audio session/engine in SwiftUI previews – they crash.
         if Self.isPreview {
             self.fakeIdleAnimation()
@@ -69,6 +78,7 @@ final class AudioAnalyzer: ObservableObject {
                 }
             }
         }
+        */
     }
 
     func stop() {

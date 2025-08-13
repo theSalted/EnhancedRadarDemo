@@ -23,6 +23,7 @@ struct EventsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Button {
+                    HapticService.shared.medium()
                     showRadioView = true
                 } label: {
                     ZStack {
@@ -143,22 +144,27 @@ struct EventsView: View {
                 
                 Group {
                     EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        HapticService.shared.medium()
                         showRadioView = true
                     }
                     
                     EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        HapticService.shared.medium()
                         showRadioView = true
                     }
                     
                     EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        HapticService.shared.medium()
                         showRadioView = true
                     }
                     
                     EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        HapticService.shared.medium()
                         showRadioView = true
                     }
                     
                     EventCardView("Small plane skids of runway and into Lake Washington", time: "4m ago", airportCode: "SFO", planeType: "B737", planeSymbolName: "B737Symbol") {
+                        HapticService.shared.medium()
                         showRadioView = true
                     }
                 }

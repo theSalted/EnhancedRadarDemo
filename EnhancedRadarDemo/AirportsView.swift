@@ -24,6 +24,7 @@ struct AirportsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Button {
+                    HapticService.shared.medium()
                     showAirportDetailView = true
                 } label: {
                     ZStack {
@@ -181,6 +182,7 @@ struct AirportsView: View {
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
                     ){
+                        HapticService.shared.medium()
                         showAirportDetailView = true
                     }
                     
@@ -193,6 +195,7 @@ struct AirportsView: View {
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
                     ){
+                        HapticService.shared.medium()
                         showAirportDetailView = true
                     }
                     
@@ -205,6 +208,7 @@ struct AirportsView: View {
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
                     ) {
+                        HapticService.shared.medium()
                         showAirportDetailView = true
                     }
                     
@@ -217,6 +221,7 @@ struct AirportsView: View {
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
                     ) {
+                        HapticService.shared.medium()
                         showAirportDetailView = true
                     }
                     
@@ -229,6 +234,7 @@ struct AirportsView: View {
                         weatherText: "84° and raining with gusty winds",
                         viewCount: "13.4k"
                     ) {
+                        HapticService.shared.medium()
                         showAirportDetailView = true
                     }
                 }

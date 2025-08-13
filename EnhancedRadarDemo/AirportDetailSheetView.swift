@@ -55,14 +55,17 @@ struct AirportDetailSheetView: View {
                             .fontWeight(.semibold)
                         
                         RadioCardView("Tower", description: "Control takeoffs & landing on runways 10 & 28") {
+                            HapticService.shared.medium()
                             showRadioView = true
                         }
                         
                         RadioCardView("Ground", description: "Control takeoffs & landing on runways 10 & 28") {
+                            HapticService.shared.medium()
                             showRadioView = true
                         }
                         
                         RadioCardView("Ground 2", description: "Control takeoffs & landing on runways 10 & 28") {
+                            HapticService.shared.medium()
                             showRadioView = true
                         }
                         
@@ -78,6 +81,7 @@ struct AirportDetailSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        HapticService.shared.medium()
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
