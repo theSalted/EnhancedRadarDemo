@@ -36,6 +36,22 @@ struct AirportsView: View {
                             gyroSensitivity: 1.0,
                             perspectiveDepth: 600
                         )
+                        .mask {
+                            GeometryReader { proxy in
+                                Rectangle().fill(
+                                    .radialGradient(
+                                        stops: [
+                                            .init(color: .white, location: 0.0),
+                                            .init(color: .white, location: 0.35),
+                                            .init(color: .clear, location: 0.9)
+                                        ],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: min(proxy.size.width, proxy.size.height) * 0.65
+                                    )
+                                )
+                            }
+                        }
                         .opacity(1 - scrollProperties.featureTriggerProgress)
                         
                         Image("SFOTower")

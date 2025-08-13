@@ -70,6 +70,23 @@ struct RadioSheetView: View {
                     disablePan: true
                 )
                 .ignoresSafeArea()
+                .mask {
+                    GeometryReader { proxy in
+                        Rectangle().fill(
+                            .radialGradient(
+                                stops: [
+                                    .init(color: .white, location: 0.0),
+                                    .init(color: .white, location: 0.45),
+                                    .init(color: .clear, location: 0.9)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: min(proxy.size.width, proxy.size.height) * 0.65
+                            )
+                        )
+                        .offset(y: -170)
+                    }
+                }
                 
                 Rectangle()
                     .foregroundStyle(
@@ -96,6 +113,7 @@ struct RadioSheetView: View {
                         ScrollViewReader { proxy in
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 0) {
+                                    Spacer(minLength: 300)
                                     ForEach(liveTranscript) { line in
                                         Text(line.speaker)
                                             .font(.system(size: 24, weight: .semibold))
@@ -119,13 +137,14 @@ struct RadioSheetView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 240)
+                        .frame(height: 260)
                         .mask {
                             LinearGradient(
                                 stops: [
-                                    .init(color: .clear, location: 0.0),   // hide at very top
-                                    .init(color: .white, location: 0.62),  // fade-in complete by 12%
-                                    .init(color: .white, location: 1.0)    // fully visible below
+                                    .init(color: .clear, location: 0.0),
+                                    .init(color: .white.opacity(0.3), location: 0.3),
+                                    .init(color: .white, location: 0.92),
+                                    .init(color: .white, location: 1.0)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -166,6 +185,7 @@ struct RadioSheetView: View {
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.bannerIncidentBackground)
                                     .padding(5)
+                                    .padding(.horizontal, 2)
                                     .background {
                                         RoundedRectangle(cornerRadius: 6)
                                     }
@@ -181,7 +201,7 @@ struct RadioSheetView: View {
                             
                             // MARK: Airport Info
                             VStack {
-                                HStack {
+                                HStack(spacing: 12) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 10)
                                             .foregroundStyle(.black.opacity(0.13))
@@ -196,7 +216,7 @@ struct RadioSheetView: View {
                                     }
                                     .frame(width: 45, height: 45)
                                     VStack {
-                                        HStack(alignment: .top) {
+                                        HStack(alignment: .top, spacing: 15) {
                                             Text("SFO")
                                                 .font(.system(size: 54, weight: .heavy, design: .rounded))
                                                 .foregroundStyle(.radioForeground)
@@ -216,6 +236,7 @@ struct RadioSheetView: View {
                                 }
                                 .frame(height: 45)
                                 .padding()
+                                .padding(.top, 10)
                                 
                                 // MARK: Audio Visualizer
                                 AudioVisualizerView(
@@ -230,7 +251,7 @@ struct RadioSheetView: View {
                             
                             
                         }
-                        .frame(height: 141)
+                        .frame(height: 150)
                     }
                     
                 }
@@ -281,134 +302,7 @@ struct RadioSheetView: View {
     }
 }
 
-struct BackgroundGridPattern: View {
-    // Grid look
-    var spacing: CGFloat = 16
-    var majorEvery: Int = 4
-    var color: Color = .secondary.opacity(0.25)
-    var majorColor: Color = .secondary.opacity(0.45)
-    var lineWidth: CGFloat = 0.5
-    var majorLineWidth: CGFloat = 1
 
-    // Animation controls
-    /// External offset you can drive (e.g. with scroll/camera)
-    var phase: CGSize = .zero
-    /// If non-zero, the grid will auto-scroll at this velocity (pts/sec)
-    var velocity: CGSize = .zero
-    /// Use pixel-snapping if your lines look fuzzy
-    var snapToPixel: Bool = true
-    
-    // 3D Effect controls
-    /// Enable 3D perspective effect
-    var enable3D: Bool = false
-    /// Use gyroscope for dynamic 3D effect
-    var useGyro: Bool = false
-    /// Sensitivity of gyro effect (0.1 to 2.0)
-    var gyroSensitivity: Double = 1.0
-    /// Manual 3D rotation (used when gyro is disabled)
-    var manual3DRotation: CGSize = .zero
-    /// Perspective depth (smaller = more dramatic)
-    var perspectiveDepth: CGFloat = 500
-    /// Disable pan for grids with velocity
-    var disablePan: Bool = false
-    
-    @ObservedObject private var gyro = GyroService.shared
-
-    var body: some View {
-        Group {
-            if velocity == .zero {
-                gridCanvas(phase: phase)
-            } else {
-                TimelineView(.animation) { timeline in
-                    let t = timeline.date.timeIntervalSinceReferenceDate
-                    let auto = CGSize(width: CGFloat(t) * velocity.width,
-                                      height: CGFloat(t) * velocity.height)
-                    gridCanvas(phase: CGSize(width: phase.width + auto.width,
-                                             height: phase.height + auto.height))
-                }
-            }
-        }
-        .ignoresSafeArea()
-        .drawingGroup(opaque: false, colorMode: .linear)
-        .if(enable3D) { view in
-            view.apply3DEffect(
-                useGyro: useGyro,
-                gyro: gyro,
-                gyroSensitivity: gyroSensitivity,
-                manual3DRotation: manual3DRotation,
-                perspectiveDepth: perspectiveDepth,
-                disablePan: disablePan
-            )
-        }
-        .onAppear {
-            if useGyro && enable3D {
-                gyro.requestStart()
-            }
-        }
-        .onDisappear {
-            if useGyro && enable3D {
-                gyro.requestStop()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func gridCanvas(phase: CGSize) -> some View {
-        Canvas { context, size in
-            // Add padding to extend grid beyond visible area when rotated
-            let padding: CGFloat = enable3D ? 600 : 0
-            let w = size.width + padding * 2
-            let h = size.height + padding * 2
-
-            // Wrap phase into a single spacing to avoid huge values
-            @inline(__always)
-            func wrapped(_ value: CGFloat, by step: CGFloat) -> CGFloat {
-                guard step > 0 else { return 0 }
-                let r = value.remainder(dividingBy: step)
-                return r >= 0 ? r : (r + step)
-            }
-
-            let ox = wrapped(phase.width, by: spacing)
-            let oy = wrapped(phase.height, by: spacing)
-
-            var minor = Path()
-            var major = Path()
-
-            // Pixel snap: align to half-pixel for hairlines on 1x scale
-            let half: CGFloat = snapToPixel ? 0.5 : 0
-
-            // Vertical lines (extended with padding)
-            var col = 0
-            for x in stride(from: -ox - padding, through: w, by: spacing) {
-                let px = x.rounded() + half
-                var p = Path()
-                p.move(to: CGPoint(x: px, y: -padding))
-                p.addLine(to: CGPoint(x: px, y: h))
-                if (col % max(majorEvery, 1) == 0) { major.addPath(p) } else { minor.addPath(p) }
-                col += 1
-            }
-
-            // Horizontal lines (extended with padding)
-            var row = 0
-            for y in stride(from: -oy - padding, through: h, by: spacing) {
-                let py = y.rounded() + half
-                var p = Path()
-                p.move(to: CGPoint(x: -padding, y: py))
-                p.addLine(to: CGPoint(x: w, y: py))
-                if (row % max(majorEvery, 1) == 0) { major.addPath(p) } else { minor.addPath(p) }
-                row += 1
-            }
-
-            context.stroke(minor, with: .color(color), lineWidth: lineWidth)
-            context.stroke(major, with: .color(majorColor), lineWidth: majorLineWidth)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .if(enable3D) { view in
-            // Scale up significantly to ensure coverage during rotation
-            view.scaleEffect(1.8)
-        }
-    }
-}
 
 // MARK: - Helper Extensions for 3D Effect
 
