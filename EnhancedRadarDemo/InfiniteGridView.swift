@@ -21,6 +21,9 @@ struct InfiniteGridView: View {
     var velocityX: CGFloat = 0
     var velocityY: CGFloat = 0
     
+    // Camera control
+    var allowsCameraControl: Bool = false
+    
     var body: some View {
         TransparentSceneView(
             spacing: spacing,
@@ -30,7 +33,8 @@ struct InfiniteGridView: View {
             lineWidth: lineWidth,
             majorLineWidth: majorLineWidth,
             velocityX: velocityX,
-            velocityY: velocityY
+            velocityY: velocityY,
+            allowsCameraControl: allowsCameraControl
         )
         .ignoresSafeArea()
     }
@@ -63,7 +67,7 @@ struct InfiniteGridView: View {
         // With camera at z=10 and FOV=60°, this scaling gives us accurate point-to-visual mapping
         let pointToSceneKitScale: Float = 0.1
         
-        // Grid dimensions - make it large enough to feel infinite
+        // Grid dimensions - efficient size since camera moves, not grid
         let gridSize: Float = 200  // Adjusted for the scaling
         let step = Float(spacing) * pointToSceneKitScale
         let majorStep = Int(majorEvery)
@@ -169,10 +173,11 @@ struct TransparentSceneView: UIViewRepresentable {
     let majorLineWidth: CGFloat
     let velocityX: CGFloat
     let velocityY: CGFloat
+    let allowsCameraControl: Bool
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
-        scnView.allowsCameraControl = true
+        scnView.allowsCameraControl = allowsCameraControl  // Use the parameter
         scnView.backgroundColor = UIColor.clear
         scnView.isOpaque = false
         scnView.antialiasingMode = .multisampling4X
@@ -188,31 +193,118 @@ struct TransparentSceneView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
-        // Recreate the scene when grid properties change
-        let newScene = createGridScene()
-        uiView.scene = newScene
+        guard let scene = uiView.scene,
+              let gridNode = scene.rootNode.childNode(withName: "gridNode", recursively: true) else {
+            return
+        }
         
-        // Find the grid node and update its animation
-        if let gridNode = newScene.rootNode.childNode(withName: "gridNode", recursively: true) {
-            updateGridAnimation(gridNode: gridNode)
+        // Update grid geometry only if spacing or majorEvery changed
+        updateGridGeometry(gridNode: gridNode)
+        
+        // Update materials/colors
+        updateGridMaterials(gridNode: gridNode)
+        
+        // Update animation (velocity changes)
+        updateGridAnimation(gridNode: gridNode, scene: scene)
+    }
+    
+    private func updateGridAnimation(gridNode: SCNNode, scene: SCNScene) {
+        gridNode.removeAllActions()
+        
+        // Also stop any camera animations that might conflict with user camera controls
+        if let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) {
+            cameraNode.removeAllActions()
+        }
+        
+        if velocityX != 0 || velocityY != 0 {
+            let step = Float(spacing) * 0.1  // Grid spacing in SceneKit units
+            
+            // Animate the grid with smart wrapping that preserves major line pattern
+            let moveAction = SCNAction.customAction(duration: 0.016) { node, elapsedTime in
+                let currentPos = node.position
+                
+                // Calculate movement per frame
+                let frameMoveX = Float(self.velocityX) * 0.1 * 0.016
+                let frameMoveY = Float(self.velocityY) * 0.1 * 0.016
+                
+                // Apply movement
+                let newX = currentPos.x + frameMoveX
+                let newY = currentPos.y + frameMoveY
+                
+                // Smart wrapping: wrap to maintain major line alignment
+                let majorStepSize = step * Float(self.majorEvery)
+                
+                // Wrap within major grid boundaries to preserve major line pattern
+                let wrappedX = self.smartWrap(value: newX, stepSize: majorStepSize)
+                let wrappedY = self.smartWrap(value: newY, stepSize: majorStepSize)
+                
+                node.position = SCNVector3(wrappedX, wrappedY, currentPos.z)
+            }
+            
+            let infiniteAction = SCNAction.repeatForever(moveAction)
+            gridNode.runAction(infiniteAction, forKey: "gridAnimation")
         }
     }
     
-    private func updateGridAnimation(gridNode: SCNNode) {
-        gridNode.removeAllActions()
+    private func smartWrap(value: Float, stepSize: Float) -> Float {
+        // Wrap to the nearest major grid boundary to preserve major line pattern
+        let wrapped = value.truncatingRemainder(dividingBy: stepSize)
+        return wrapped >= 0 ? wrapped : wrapped + stepSize
+    }
+    
+    private func updateGridGeometry(gridNode: SCNNode) {
+        // Remove all child nodes and recreate geometry
+        gridNode.childNodes.forEach { $0.removeFromParentNode() }
         
-        if velocityX != 0 || velocityY != 0 {
-            // Calculate movement per second (convert velocity from points to SceneKit units)
-            let moveX = Float(velocityX) * 0.1 // Apply same scaling as our grid
-            let moveY = Float(velocityY) * 0.1
+        // Recreate grid with current parameters
+        let pointToSceneKitScale: Float = 0.1
+        let gridSize: Float = 200
+        let step = Float(spacing) * pointToSceneKitScale
+        let majorStep = Int(majorEvery)
+        
+        // Create minor lines
+        let minorLines = createGridLines(
+            gridSize: gridSize,
+            step: step,
+            majorStep: majorStep,
+            isMajor: false
+        )
+        
+        // Create major lines
+        let majorLines = createGridLines(
+            gridSize: gridSize,
+            step: step,
+            majorStep: majorStep,
+            isMajor: true
+        )
+        
+        gridNode.addChildNode(minorLines)
+        gridNode.addChildNode(majorLines)
+    }
+    
+    private func updateGridMaterials(gridNode: SCNNode) {
+        // Update colors for all child nodes
+        func updateNodeMaterials(_ node: SCNNode, isMajor: Bool) {
+            if let geometry = node.geometry,
+               let material = geometry.materials.first {
+                let lineColor = isMajor ? majorColor : color
+                material.diffuse.contents = UIColor(lineColor)
+            }
             
-            // Create a 1-second move action
-            let moveAction = SCNAction.moveBy(x: CGFloat(moveX), y: CGFloat(moveY), z: 0, duration: 1.0)
-            
-            // Repeat forever
-            let infiniteAction = SCNAction.repeatForever(moveAction)
-            
-            gridNode.runAction(infiniteAction, forKey: "gridAnimation")
+            // Recursively update child nodes
+            for childNode in node.childNodes {
+                updateNodeMaterials(childNode, isMajor: isMajor)
+            }
+        }
+        
+        // Update minor lines (first child)
+        if gridNode.childNodes.count > 0 {
+            updateNodeMaterials(gridNode.childNodes[0], isMajor: false)
+        }
+        
+        // Update major lines (second child)
+        if gridNode.childNodes.count > 1 {
+            updateNodeMaterials(gridNode.childNodes[1], isMajor: true)
         }
     }
     
@@ -243,7 +335,7 @@ struct TransparentSceneView: UIViewRepresentable {
         // Convert SwiftUI points to SceneKit units for accurate spacing
         let pointToSceneKitScale: Float = 0.1
         
-        // Grid dimensions - make it large enough to feel infinite
+        // Grid dimensions - efficient size since camera moves, not grid
         let gridSize: Float = 200
         let step = Float(spacing) * pointToSceneKitScale
         let majorStep = Int(majorEvery)
@@ -278,9 +370,10 @@ struct TransparentSceneView: UIViewRepresentable {
         
         // Calculate line thickness based on line width parameters
         let actualLineWidth = isMajor ? Float(majorLineWidth) : Float(lineWidth)
-        let cylinderRadius = actualLineWidth * 0.05 // Convert points to SceneKit radius
+        let baseRadius = actualLineWidth * 0.05 // Convert points to SceneKit radius
+        let cylinderRadius = max(baseRadius, 0.002) // Minimum radius to prevent jitter on very thin lines
         
-        // Create material once for all lines
+        // Create material once for all lines with anti-aliasing
         let material = SCNMaterial()
         let lineColor = isMajor ? majorColor : color
         material.diffuse.contents = UIColor(lineColor)
@@ -288,18 +381,28 @@ struct TransparentSceneView: UIViewRepresentable {
         material.isDoubleSided = true
         material.transparency = 1.0
         
+        // Anti-aliasing settings for thin lines
+        material.fillMode = .fill
+        material.cullMode = .back
+        material.writesToDepthBuffer = true
+        material.readsFromDepthBuffer = true
+        
         // Create vertical lines centered around origin
         let startIndex = -numLines/2
         let endIndex = numLines/2
         
         for i in startIndex...endIndex {
-            let shouldDraw = isMajor ? (i % majorStep == 0) : (i % majorStep != 0)
-            guard shouldDraw else { continue }
-            
             let x = Float(i) * step
             
-            // Create vertical cylinder line
+            // Calculate major line based on world position, not array index, to maintain pattern during wrapping
+            let worldGridX = Int(round(x / step))
+            let shouldDraw = isMajor ? (worldGridX % majorStep == 0) : (worldGridX % majorStep != 0)
+            guard shouldDraw else { continue }
+            
+            // Create vertical cylinder line with higher resolution for smoother edges
             let verticalCylinder = SCNCylinder(radius: CGFloat(cylinderRadius), height: CGFloat(gridSize))
+            verticalCylinder.radialSegmentCount = 12  // Higher resolution for anti-aliasing
+            verticalCylinder.heightSegmentCount = 1   // Keep height simple
             verticalCylinder.materials = [material]
             
             let verticalNode = SCNNode(geometry: verticalCylinder)
@@ -311,13 +414,17 @@ struct TransparentSceneView: UIViewRepresentable {
         
         // Create horizontal lines centered around origin
         for i in startIndex...endIndex {
-            let shouldDraw = isMajor ? (i % majorStep == 0) : (i % majorStep != 0)
-            guard shouldDraw else { continue }
-            
             let y = Float(i) * step
             
-            // Create horizontal cylinder line
+            // Calculate major line based on world position, not array index, to maintain pattern during wrapping
+            let worldGridY = Int(round(y / step))
+            let shouldDraw = isMajor ? (worldGridY % majorStep == 0) : (worldGridY % majorStep != 0)
+            guard shouldDraw else { continue }
+            
+            // Create horizontal cylinder line with higher resolution for smoother edges
             let horizontalCylinder = SCNCylinder(radius: CGFloat(cylinderRadius), height: CGFloat(gridSize))
+            horizontalCylinder.radialSegmentCount = 12  // Higher resolution for anti-aliasing
+            horizontalCylinder.heightSegmentCount = 1   // Keep height simple
             horizontalCylinder.materials = [material]
             
             let horizontalNode = SCNNode(geometry: horizontalCylinder)
