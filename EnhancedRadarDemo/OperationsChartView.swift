@@ -8,7 +8,7 @@
 import SwiftUI
 import Charts
 
-struct OperationDataPoint {
+struct OperationDataPoint: Equatable {
     var time: Date
     var count: Double
 }
@@ -33,6 +33,9 @@ let currentData: [OperationDataPoint] = [
 ].map { OperationDataPoint(time: hour($0.0), count: $0.1) }
 
 struct OperationsChartView: View {
+    @State private var shownCount = 0
+    @State private var hasAnimated = false
+    @State private var animatedData: [OperationDataPoint] = currentData.map { OperationDataPoint(time: $0.time, count: 0) }
     // Match the old 6.5...18.5 domain using :30 minutes
     private let xStart = hour(6, minute: 30)
     private let xEnd   = hour(18, minute: 30)
@@ -66,7 +69,7 @@ struct OperationsChartView: View {
 
             // Foreground (current) bars
             Chart {
-                ForEach(currentData, id: \.time) { shape in
+                ForEach(Array(animatedData.enumerated()).prefix(shownCount), id: \.0) { idx, shape in
                     BarMark(
                         x: .value("time", shape.time),
                         y: .value("count", shape.count),
@@ -74,6 +77,26 @@ struct OperationsChartView: View {
                     )
                     .cornerRadius(4)
                     .foregroundStyle(.bannerIncidentBackground)
+                }
+            }
+            .animation(.easeOut(duration: 0.25), value: animatedData)
+            .task {
+                guard !hasAnimated else { return }
+                hasAnimated = true
+                shownCount = 0
+                // Reset animated data to zeros
+                animatedData = currentData.map { OperationDataPoint(time: $0.time, count: 0) }
+                for i in 0..<currentData.count {
+                    // cadence between bars
+                    try? await Task.sleep(nanoseconds: 60_000_000) // 0.06s
+                    // Phase 1: reveal the next bar at height 0 (no animation needed here)
+                    shownCount = i + 1
+                    // Defer to next runloop so Charts sees a value change on an existing mark
+                    await Task.yield()
+                    // Phase 2: animate from 0 -> target height
+                    withAnimation(.easeOut(duration: 0.28)) {
+                        animatedData[i].count = currentData[i].count
+                    }
                 }
             }
             .chartXAxis {
