@@ -7,6 +7,7 @@
 
 
 import SwiftUI
+import OSLog
 
 struct RadioSheetView: View {
     @Environment(\.dismiss) private var dismiss
@@ -59,9 +60,14 @@ struct RadioSheetView: View {
         NavigationStack {
             ZStack {
                 BackgroundGridPattern(
-                    spacing: 80,
+                    spacing: 50,
                     majorEvery: 1,
-                    velocity: CGSize(width: -100, height: -50)
+                    velocity: CGSize(width: -100, height: -50),
+                    enable3D: true,
+                    useGyro: true,
+                    gyroSensitivity: 1.5,
+                    perspectiveDepth: 600,
+                    disablePan: true
                 )
                 .ignoresSafeArea()
                 
@@ -291,6 +297,22 @@ struct BackgroundGridPattern: View {
     var velocity: CGSize = .zero
     /// Use pixel-snapping if your lines look fuzzy
     var snapToPixel: Bool = true
+    
+    // 3D Effect controls
+    /// Enable 3D perspective effect
+    var enable3D: Bool = false
+    /// Use gyroscope for dynamic 3D effect
+    var useGyro: Bool = false
+    /// Sensitivity of gyro effect (0.1 to 2.0)
+    var gyroSensitivity: Double = 1.0
+    /// Manual 3D rotation (used when gyro is disabled)
+    var manual3DRotation: CGSize = .zero
+    /// Perspective depth (smaller = more dramatic)
+    var perspectiveDepth: CGFloat = 500
+    /// Disable pan for grids with velocity
+    var disablePan: Bool = false
+    
+    @ObservedObject private var gyro = GyroService.shared
 
     var body: some View {
         Group {
@@ -308,13 +330,35 @@ struct BackgroundGridPattern: View {
         }
         .ignoresSafeArea()
         .drawingGroup(opaque: false, colorMode: .linear)
+        .if(enable3D) { view in
+            view.apply3DEffect(
+                useGyro: useGyro,
+                gyro: gyro,
+                gyroSensitivity: gyroSensitivity,
+                manual3DRotation: manual3DRotation,
+                perspectiveDepth: perspectiveDepth,
+                disablePan: disablePan
+            )
+        }
+        .onAppear {
+            if useGyro && enable3D {
+                gyro.requestStart()
+            }
+        }
+        .onDisappear {
+            if useGyro && enable3D {
+                gyro.requestStop()
+            }
+        }
     }
 
     @ViewBuilder
     private func gridCanvas(phase: CGSize) -> some View {
         Canvas { context, size in
-            let w = size.width
-            let h = size.height
+            // Add padding to extend grid beyond visible area when rotated
+            let padding: CGFloat = enable3D ? 600 : 0
+            let w = size.width + padding * 2
+            let h = size.height + padding * 2
 
             // Wrap phase into a single spacing to avoid huge values
             @inline(__always)
@@ -333,23 +377,23 @@ struct BackgroundGridPattern: View {
             // Pixel snap: align to half-pixel for hairlines on 1x scale
             let half: CGFloat = snapToPixel ? 0.5 : 0
 
-            // Vertical lines
+            // Vertical lines (extended with padding)
             var col = 0
-            for x in stride(from: -ox, through: w, by: spacing) {
+            for x in stride(from: -ox - padding, through: w, by: spacing) {
                 let px = x.rounded() + half
                 var p = Path()
-                p.move(to: CGPoint(x: px, y: 0))
+                p.move(to: CGPoint(x: px, y: -padding))
                 p.addLine(to: CGPoint(x: px, y: h))
                 if (col % max(majorEvery, 1) == 0) { major.addPath(p) } else { minor.addPath(p) }
                 col += 1
             }
 
-            // Horizontal lines
+            // Horizontal lines (extended with padding)
             var row = 0
-            for y in stride(from: -oy, through: h, by: spacing) {
+            for y in stride(from: -oy - padding, through: h, by: spacing) {
                 let py = y.rounded() + half
                 var p = Path()
-                p.move(to: CGPoint(x: 0, y: py))
+                p.move(to: CGPoint(x: -padding, y: py))
                 p.addLine(to: CGPoint(x: w, y: py))
                 if (row % max(majorEvery, 1) == 0) { major.addPath(p) } else { minor.addPath(p) }
                 row += 1
@@ -358,6 +402,63 @@ struct BackgroundGridPattern: View {
             context.stroke(minor, with: .color(color), lineWidth: lineWidth)
             context.stroke(major, with: .color(majorColor), lineWidth: majorLineWidth)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .if(enable3D) { view in
+            // Scale up significantly to ensure coverage during rotation
+            view.scaleEffect(1.8)
+        }
+    }
+}
+
+// MARK: - Helper Extensions for 3D Effect
+
+extension View {
+    /// Conditional view modifier
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+    
+    /// Apply 3D perspective effect with optional gyro
+    func apply3DEffect(
+        useGyro: Bool,
+        gyro: GyroService,
+        gyroSensitivity: Double,
+        manual3DRotation: CGSize,
+        perspectiveDepth: CGFloat,
+        disablePan: Bool = false
+    ) -> some View {
+        let rotation = useGyro
+            ? CGSize(
+                width: gyro.normalizedRotation.roll * 35 * gyroSensitivity,  // Roll sensitivity (left/right)
+                height: 0  // Disable pitch (forward/back)
+            )
+            : manual3DRotation
+        
+        // Add subtle parallax pan effect (only for stationary grids)
+        // Only horizontal pan since we disabled vertical rotation
+        let pan = (useGyro && !disablePan)
+            ? CGSize(
+                width: gyro.normalizedRotation.roll * 25 * gyroSensitivity,   // Horizontal pan
+                height: 0  // Disable vertical pan
+            )
+            : .zero
+        
+        return self
+            .offset(x: pan.width, y: pan.height)
+            .rotation3DEffect(
+                .degrees(rotation.width),  // Only Y-axis rotation (roll)
+                axis: (x: 0, y: 1, z: 0),
+                anchor: .center,
+                anchorZ: 0,
+                perspective: 1 / perspectiveDepth
+            )
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: rotation)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: pan)
     }
 }
 

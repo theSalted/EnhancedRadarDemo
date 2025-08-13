@@ -29,8 +29,12 @@ struct AirportsView: View {
                     ZStack {
                         
                         BackgroundGridPattern(
-                            spacing: 80,
-                            majorEvery: 1
+                            spacing: 50,
+                            majorEvery: 1,
+                            enable3D: true,
+                            useGyro: true,
+                            gyroSensitivity: 1.0,
+                            perspectiveDepth: 600
                         )
                         .opacity(1 - scrollProperties.featureTriggerProgress)
                         
