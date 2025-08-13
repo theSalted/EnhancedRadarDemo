@@ -24,6 +24,10 @@ struct InfiniteGridView: View {
     // Camera control
     var allowsCameraControl: Bool = false
     
+    // Gyro control (nil = disabled completely, CGFloat = sensitivity multiplier)
+    var gyroSensitivityX: CGFloat? = nil
+    var gyroSensitivityY: CGFloat? = nil
+    
     var body: some View {
         TransparentSceneView(
             spacing: spacing,
@@ -34,7 +38,9 @@ struct InfiniteGridView: View {
             majorLineWidth: majorLineWidth,
             velocityX: velocityX,
             velocityY: velocityY,
-            allowsCameraControl: allowsCameraControl
+            allowsCameraControl: allowsCameraControl,
+            gyroSensitivityX: gyroSensitivityX,
+            gyroSensitivityY: gyroSensitivityY
         )
         .ignoresSafeArea()
     }
@@ -174,6 +180,10 @@ struct TransparentSceneView: UIViewRepresentable {
     let velocityX: CGFloat
     let velocityY: CGFloat
     let allowsCameraControl: Bool
+    let gyroSensitivityX: CGFloat?
+    let gyroSensitivityY: CGFloat?
+    
+    @StateObject private var gyro = GyroService.shared
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
@@ -189,6 +199,11 @@ struct TransparentSceneView: UIViewRepresentable {
         let scene = createGridScene()
         scnView.scene = scene
         
+        // Start gyro if any sensitivity is set
+        if gyroSensitivityX != nil || gyroSensitivityY != nil {
+            gyro.requestStart()
+        }
+        
         return scnView
     }
     
@@ -198,14 +213,33 @@ struct TransparentSceneView: UIViewRepresentable {
             return
         }
         
+        // Update camera control setting
+        uiView.allowsCameraControl = allowsCameraControl
+        
         // Update grid geometry only if spacing or majorEvery changed
         updateGridGeometry(gridNode: gridNode)
         
         // Update materials/colors
         updateGridMaterials(gridNode: gridNode)
         
+        // Update gyro lifecycle based on sensitivity settings
+        updateGyroLifecycle()
+        
         // Update animation (velocity changes)
         updateGridAnimation(gridNode: gridNode, scene: scene)
+    }
+    
+    private func updateGyroLifecycle() {
+        // Start gyro if any sensitivity is set, stop if both are nil
+        if gyroSensitivityX != nil || gyroSensitivityY != nil {
+            if !gyro.isActive {
+                gyro.requestStart()
+            }
+        } else {
+            if gyro.isActive {
+                gyro.requestStop()
+            }
+        }
     }
     
     private func updateGridAnimation(gridNode: SCNNode, scene: SCNScene) {
@@ -216,20 +250,39 @@ struct TransparentSceneView: UIViewRepresentable {
             cameraNode.removeAllActions()
         }
         
-        if velocityX != 0 || velocityY != 0 {
+        // Check if we have any movement (velocity or gyro)
+        let hasVelocity = velocityX != 0 || velocityY != 0
+        let hasGyro = (gyroSensitivityX != nil || gyroSensitivityY != nil) && gyro.isActive
+        
+        if hasVelocity || hasGyro {
             let step = Float(spacing) * 0.1  // Grid spacing in SceneKit units
             
             // Animate the grid with smart wrapping that preserves major line pattern
             let moveAction = SCNAction.customAction(duration: 0.016) { node, elapsedTime in
                 let currentPos = node.position
                 
-                // Calculate movement per frame
-                let frameMoveX = Float(self.velocityX) * 0.1 * 0.016
-                let frameMoveY = Float(self.velocityY) * 0.1 * 0.016
+                // Calculate base velocity movement per frame
+                let baseFrameMoveX = Float(self.velocityX) * 0.1 * 0.016
+                let baseFrameMoveY = Float(self.velocityY) * 0.1 * 0.016
+                
+                // Add gyro influence if enabled
+                var gyroOffsetX: Float = 0
+                var gyroOffsetY: Float = 0
+                
+                if let sensX = self.gyroSensitivityX {
+                    gyroOffsetX = Float(self.gyro.normalizedRotation.roll * sensX) * 0.1 * 0.016
+                }
+                if let sensY = self.gyroSensitivityY {
+                    gyroOffsetY = Float(-self.gyro.normalizedRotation.pitch * sensY) * 0.1 * 0.016  // Negative for natural feel
+                }
+                
+                // Combine velocity and gyro movement
+                let totalFrameMoveX = baseFrameMoveX + gyroOffsetX
+                let totalFrameMoveY = baseFrameMoveY + gyroOffsetY
                 
                 // Apply movement
-                let newX = currentPos.x + frameMoveX
-                let newY = currentPos.y + frameMoveY
+                let newX = currentPos.x + totalFrameMoveX
+                let newY = currentPos.y + totalFrameMoveY
                 
                 // Smart wrapping: wrap to maintain major line alignment
                 let majorStepSize = step * Float(self.majorEvery)
@@ -365,7 +418,7 @@ struct TransparentSceneView: UIViewRepresentable {
     private func createGridLines(gridSize: Float, step: Float, majorStep: Int, isMajor: Bool) -> SCNNode {
         let linesNode = SCNNode()
         
-        let halfSize = gridSize / 2
+        _ = gridSize / 2
         let numLines = Int(gridSize / step)
         
         // Calculate line thickness based on line width parameters
@@ -449,6 +502,10 @@ struct TransparentSceneView: UIViewRepresentable {
         @State private var majorColorOpacity: Double = 1
         @State private var velocityX: CGFloat = 0
         @State private var velocityY: CGFloat = 0
+        @State private var allowsCameraControl: Bool = false
+        @State private var gyroEnabled: Bool = false
+        @State private var gyroSensitivityX: CGFloat = 50
+        @State private var gyroSensitivityY: CGFloat = 50
         
         var body: some View {
             VStack {
@@ -468,7 +525,10 @@ struct TransparentSceneView: UIViewRepresentable {
                         lineWidth: lineWidth,
                         majorLineWidth: majorLineWidth,
                         velocityX: velocityX,
-                        velocityY: velocityY
+                        velocityY: velocityY,
+                        allowsCameraControl: allowsCameraControl,
+                        gyroSensitivityX: gyroEnabled ? gyroSensitivityX : nil,
+                        gyroSensitivityY: gyroEnabled ? gyroSensitivityY : nil
                     )
                 }
                 
@@ -514,6 +574,30 @@ struct TransparentSceneView: UIViewRepresentable {
                     HStack {
                         Text("Velocity Y: \(Int(velocityY))pt/s")
                         Slider(value: $velocityY, in: -100...100, step: 5)
+                    }
+                    
+                    HStack {
+                        Text("Camera Control")
+                        Spacer()
+                        Toggle("", isOn: $allowsCameraControl)
+                    }
+                    
+                    HStack {
+                        Text("Gyro Enabled")
+                        Spacer()
+                        Toggle("", isOn: $gyroEnabled)
+                    }
+                    
+                    if gyroEnabled {
+                        HStack {
+                            Text("Gyro X Sensitivity: \(Int(gyroSensitivityX))")
+                            Slider(value: $gyroSensitivityX, in: 0...200, step: 5)
+                        }
+                        
+                        HStack {
+                            Text("Gyro Y Sensitivity: \(Int(gyroSensitivityY))")
+                            Slider(value: $gyroSensitivityY, in: 0...200, step: 5)
+                        }
                     }
                 }
                 .padding()
