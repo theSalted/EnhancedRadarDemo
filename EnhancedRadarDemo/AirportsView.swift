@@ -28,7 +28,6 @@ struct AirportsView: View {
                     showAirportDetailView = true
                 } label: {
                     ZStack {
-                        
                         BackgroundGridPattern(
                             spacing: 50,
                             majorEvery: 1,
@@ -241,6 +240,7 @@ struct AirportsView: View {
                     .padding(.horizontal)
             }
         }
+        .contentMargins(.bottom, 100)
         .scrollPosition($scrollPosition)
         .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }, action: { oldValue, newValue in
             scrollProperties = newValue

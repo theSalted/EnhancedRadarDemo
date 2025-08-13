@@ -124,9 +124,8 @@ struct AirportDetailSheetView: View {
                         Spacer()
                     }
                 }
+                .contentMargins(.bottom, 100)
                 .ignoresSafeArea()
-
-                
             }
             .navigationTitle("SFO")
             .navigationSubtitle("San Francisco Int'l")
