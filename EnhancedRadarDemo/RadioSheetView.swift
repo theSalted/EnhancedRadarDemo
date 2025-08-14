@@ -9,14 +9,50 @@
 import SwiftUI
 import OSLog
 
+
+struct Plane {
+    enum State {
+        case takeoff, landing, taxing
+        
+        func tiltAngle() -> CGFloat {
+            switch self {
+                
+            case .takeoff:
+                13
+            case .landing:
+                -13
+            case .taxing:
+                0
+            }
+        }
+        
+        func gridFlightState() -> AviationGridView.FlightState {
+            switch self {
+            case .takeoff:
+                    .flight
+            case .landing:
+                    .flight
+            case .taxing:
+                    .taxing
+            }
+        }
+    }
+    
+    let imageName: String
+}
+
 struct RadioSheetView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var liveTranscript: [TranscriptLine] = [
         TranscriptLine(speaker: "ATC", text: "Delta 1008, La Guardia Tower, contact New York Departure.")
     ]
+    
     @State private var feedIndex: Int = 0
     @State private var feedTimer: Timer? = nil
+    
+    // Aviation flight state
+    @State private var flightState: AviationGridView.FlightState = .flight
     
     struct TranscriptLine: Identifiable {
         let id = UUID()
@@ -66,17 +102,20 @@ struct RadioSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                InfiniteGridView(
+                AviationGridView(
                     spacing: 10,
                     majorEvery: 1,
-                    color: .secondary.opacity(0.5),
-                    majorColor: .secondary.opacity(0.25),
-                    lineWidth: 0.1,
+                    color: .white.opacity(1),
+                    majorColor: .white.opacity(0.5),
+                    lineWidth: 0.01,
                     majorLineWidth: 0.1,
                     velocityX: 20,
                     velocityY: -10,
-                    allowsCameraControl: false
+                    allowsCameraControl: false,
+                    flightState: $flightState,
+                    animationDuration: 0.3
                 )
+                .offset(y: -400)
                 .ignoresSafeArea()
                 .mask {
                     GeometryReader { proxy in
@@ -106,13 +145,12 @@ struct RadioSheetView: View {
                     )
                     .ignoresSafeArea()
                 
-                
-                
                 VStack {
                     Spacer()
                     Image("DeltaPlane")
                         .resizable()
-                        .rotationEffect(.degrees(13))
+                        .rotationEffect(.degrees(0))
+                        .offset(y: 40)
                         .scaledToFit()
                         .padding()
 //                    Spacer()
@@ -271,6 +309,20 @@ struct RadioSheetView: View {
             }
             .ignoresSafeArea()
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        HapticService.shared.light()
+                        flightState = flightState == .flight ? .taxing : .flight
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: flightState == .flight ? "airplane" : "car")
+                            Text(flightState.description)
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.blue)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         HapticService.shared.medium()

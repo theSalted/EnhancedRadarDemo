@@ -33,6 +33,12 @@ struct InfiniteGridView: View {
     var cameraRotationY: CGFloat? = nil  // Yaw (left/right)
     var cameraRotationZ: CGFloat? = nil  // Roll (tilt)
     
+    // Animation timing for manual rotations
+    var manualRotationAnimationDuration: Double = 2.0
+    
+    // Animation-friendly spacing updates
+    var animateSpacingChanges: Bool = false
+    
     var body: some View {
         TransparentSceneView(
             spacing: spacing,
@@ -48,7 +54,9 @@ struct InfiniteGridView: View {
             gyroSensitivityY: gyroSensitivityY,
             cameraRotationX: cameraRotationX,
             cameraRotationY: cameraRotationY,
-            cameraRotationZ: cameraRotationZ
+            cameraRotationZ: cameraRotationZ,
+            manualRotationAnimationDuration: manualRotationAnimationDuration,
+            animateSpacingChanges: animateSpacingChanges
         )
         .ignoresSafeArea()
     }
@@ -167,7 +175,6 @@ struct InfiniteGridView: View {
         let material = SCNMaterial()
         let lineColor = isMajor ? majorColor : color
         material.diffuse.contents = UIColor(lineColor)
-        material.emission.contents = UIColor(lineColor)  // Make lines glow
         material.lightingModel = .constant  // Unlit material
         material.isDoubleSided = true
         material.transparency = 1.0
@@ -193,8 +200,19 @@ struct TransparentSceneView: UIViewRepresentable {
     let cameraRotationX: CGFloat?
     let cameraRotationY: CGFloat?
     let cameraRotationZ: CGFloat?
+    let manualRotationAnimationDuration: Double
+    let animateSpacingChanges: Bool
     
     @StateObject private var gyro = GyroService.shared
+    
+    // Track previous rotation values to detect changes
+    @State private var previousRotationX: CGFloat? = nil
+    @State private var previousRotationY: CGFloat? = nil
+    @State private var previousRotationZ: CGFloat? = nil
+    
+    // Track previous geometry values to detect changes
+    @State private var previousSpacing: CGFloat = 0
+    @State private var previousMajorEvery: Int = 0
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
@@ -203,12 +221,41 @@ struct TransparentSceneView: UIViewRepresentable {
         scnView.isOpaque = false
         scnView.antialiasingMode = .multisampling4X
         
-        // Additional settings to reduce flickering
+        // Additional settings to reduce flickering and double rendering
         scnView.preferredFramesPerSecond = 60
+        scnView.autoenablesDefaultLighting = false  // Disable automatic lighting
+        scnView.allowsCameraControl = allowsCameraControl
         
         // Create the scene once
         let scene = createGridScene()
         scnView.scene = scene
+        
+        // Initialize camera rotation immediately to prevent double rendering
+        if let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) {
+            var rotationX: Float = 0
+            var rotationY: Float = 0
+            var rotationZ: Float = 0
+            
+            if let rotX = cameraRotationX {
+                rotationX = Float(rotX * .pi / 180.0)
+            }
+            if let rotY = cameraRotationY {
+                rotationY = Float(rotY * .pi / 180.0)
+            }
+            if let rotZ = cameraRotationZ {
+                rotationZ = Float(rotZ * .pi / 180.0)
+            }
+            
+            // Set initial rotation without animation to prevent double rendering
+            cameraNode.eulerAngles = SCNVector3(rotationX, rotationY, rotationZ)
+        }
+        
+        // Initialize previous values
+        previousRotationX = cameraRotationX
+        previousRotationY = cameraRotationY
+        previousRotationZ = cameraRotationZ
+        previousSpacing = spacing
+        previousMajorEvery = majorEvery
         
         // Start gyro if any sensitivity is set
         if gyroSensitivityX != nil || gyroSensitivityY != nil {
@@ -227,17 +274,44 @@ struct TransparentSceneView: UIViewRepresentable {
         // Update camera control setting
         uiView.allowsCameraControl = allowsCameraControl
         
-        // Update grid geometry only if spacing or majorEvery changed
-        updateGridGeometry(gridNode: gridNode)
+        // Update grid geometry only if spacing or majorEvery actually changed
+        let geometryChanged = (spacing != previousSpacing || majorEvery != previousMajorEvery)
+        if geometryChanged {
+            if animateSpacingChanges {
+                // Use smooth transaction for spacing changes during animations
+                SCNTransaction.begin()
+                SCNTransaction.animationDuration = manualRotationAnimationDuration
+                SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                updateGridGeometry(gridNode: gridNode)
+                SCNTransaction.commit()
+            } else {
+                // Immediate update for non-animated changes
+                updateGridGeometry(gridNode: gridNode)
+            }
+            previousSpacing = spacing
+            previousMajorEvery = majorEvery
+        }
         
-        // Update materials/colors
+        // Update materials/colors (these are lightweight updates)
         updateGridMaterials(gridNode: gridNode)
         
         // Update gyro lifecycle based on sensitivity settings
         updateGyroLifecycle()
         
-        // Update camera gyro tilt
-        updateCameraGyroTilt(scene: scene)
+        // Update camera rotation only if manual rotation values changed or gyro is active
+        let rotationChanged = (cameraRotationX != previousRotationX || 
+                              cameraRotationY != previousRotationY || 
+                              cameraRotationZ != previousRotationZ)
+        let hasActiveGyro = (gyroSensitivityX != nil || gyroSensitivityY != nil) && gyro.isActive
+        
+        if rotationChanged || hasActiveGyro {
+            updateCameraGyroTilt(scene: scene)
+            
+            // Update previous values
+            previousRotationX = cameraRotationX
+            previousRotationY = cameraRotationY
+            previousRotationZ = cameraRotationZ
+        }
         
         // Update animation (velocity changes)
         updateGridAnimation(gridNode: gridNode, scene: scene)
@@ -257,7 +331,8 @@ struct TransparentSceneView: UIViewRepresentable {
     }
     
     private func updateCameraGyroTilt(scene: SCNScene) {
-        guard let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) else { return }
+        guard let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }),
+              let camera = cameraNode.camera else { return }
         
         // Calculate rotation values from gyro
         var gyroRotationX: Float = 0
@@ -301,11 +376,24 @@ struct TransparentSceneView: UIViewRepresentable {
         
         let targetRotation = SCNVector3(totalRotationX, totalRotationY, totalRotationZ)
         
-        // Use SCNTransaction for smooth animation (better than SCNAction for this case)
+        // Keep normal field of view for both flight and taxi modes
+        let adjustedFOV: CGFloat = 60  // Standard field of view always
+        
+        // Always use SCNTransaction for smooth animation, but adjust duration based on source
+        let hasActiveGyro = (gyroSensitivityX != nil || gyroSensitivityY != nil) && gyro.isActive
+        
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.1  // Shorter duration for responsiveness
-        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
+        if hasActiveGyro {
+            // Fast updates for gyro responsiveness
+            SCNTransaction.animationDuration = 0.1
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
+        } else {
+            // Use the provided animation duration for manual rotations
+            SCNTransaction.animationDuration = manualRotationAnimationDuration
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        }
         cameraNode.eulerAngles = targetRotation
+        camera.fieldOfView = adjustedFOV  // Apply perspective compensation
         SCNTransaction.commit()
     }
     
@@ -486,11 +574,14 @@ struct TransparentSceneView: UIViewRepresentable {
         material.isDoubleSided = true
         material.transparency = 1.0
         
-        // Anti-aliasing settings for thin lines
+        // Anti-aliasing settings for thin lines  
         material.fillMode = .fill
         material.cullMode = .back
         material.writesToDepthBuffer = true
         material.readsFromDepthBuffer = true
+        
+        // Prevent double rendering by ensuring proper blending
+        material.blendMode = .alpha
         
         // Create vertical lines centered around origin
         let startIndex = -numLines/2
