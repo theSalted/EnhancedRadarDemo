@@ -28,6 +28,11 @@ struct InfiniteGridView: View {
     var gyroSensitivityX: CGFloat? = nil
     var gyroSensitivityY: CGFloat? = nil
     
+    // Manual camera rotation (nil = no manual rotation, CGFloat = rotation in degrees)
+    var cameraRotationX: CGFloat? = nil  // Pitch (up/down)
+    var cameraRotationY: CGFloat? = nil  // Yaw (left/right)
+    var cameraRotationZ: CGFloat? = nil  // Roll (tilt)
+    
     var body: some View {
         TransparentSceneView(
             spacing: spacing,
@@ -40,7 +45,10 @@ struct InfiniteGridView: View {
             velocityY: velocityY,
             allowsCameraControl: allowsCameraControl,
             gyroSensitivityX: gyroSensitivityX,
-            gyroSensitivityY: gyroSensitivityY
+            gyroSensitivityY: gyroSensitivityY,
+            cameraRotationX: cameraRotationX,
+            cameraRotationY: cameraRotationY,
+            cameraRotationZ: cameraRotationZ
         )
         .ignoresSafeArea()
     }
@@ -182,6 +190,9 @@ struct TransparentSceneView: UIViewRepresentable {
     let allowsCameraControl: Bool
     let gyroSensitivityX: CGFloat?
     let gyroSensitivityY: CGFloat?
+    let cameraRotationX: CGFloat?
+    let cameraRotationY: CGFloat?
+    let cameraRotationZ: CGFloat?
     
     @StateObject private var gyro = GyroService.shared
     
@@ -248,26 +259,47 @@ struct TransparentSceneView: UIViewRepresentable {
     private func updateCameraGyroTilt(scene: SCNScene) {
         guard let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) else { return }
         
-        // Calculate rotation values matching the original apply3DEffect function
-        var rotationX: Float = 0
-        var rotationY: Float = 0
+        // Calculate rotation values from gyro
+        var gyroRotationX: Float = 0
+        var gyroRotationY: Float = 0
+        var gyroRotationZ: Float = 0
         
         if let sensX = gyroSensitivityX, gyro.isActive {
             // Original: gyro.normalizedRotation.roll * 35 * gyroSensitivity (degrees)
             // normalizedRotation.roll is already -1 to 1, multiply by sensitivity and convert to radians
             let degrees = gyro.normalizedRotation.roll * sensX
-            rotationY = Float(degrees * .pi / 180.0)  // Convert degrees to radians for SceneKit
+            gyroRotationY = Float(degrees * .pi / 180.0)  // Convert degrees to radians for SceneKit
         }
         
         if let sensY = gyroSensitivityY, gyro.isActive {
             // Pitch rotation (forward/back tilt)
             let degrees = -gyro.normalizedRotation.pitch * sensY  // Negative for natural feel
-            rotationX = Float(degrees * .pi / 180.0)
+            gyroRotationX = Float(degrees * .pi / 180.0)
         }
         
-        // Apply rotation directly with smooth animation
-        let currentRotation = cameraNode.eulerAngles
-        let targetRotation = SCNVector3(rotationX, rotationY, currentRotation.z)
+        // Add manual camera rotation values (if provided)
+        var manualRotationX: Float = 0
+        var manualRotationY: Float = 0
+        var manualRotationZ: Float = 0
+        
+        if let rotX = cameraRotationX {
+            manualRotationX = Float(rotX * .pi / 180.0)  // Convert degrees to radians
+        }
+        
+        if let rotY = cameraRotationY {
+            manualRotationY = Float(rotY * .pi / 180.0)
+        }
+        
+        if let rotZ = cameraRotationZ {
+            manualRotationZ = Float(rotZ * .pi / 180.0)
+        }
+        
+        // Combine gyro and manual rotations
+        let totalRotationX = gyroRotationX + manualRotationX
+        let totalRotationY = gyroRotationY + manualRotationY
+        let totalRotationZ = gyroRotationZ + manualRotationZ
+        
+        let targetRotation = SCNVector3(totalRotationX, totalRotationY, totalRotationZ)
         
         // Use SCNTransaction for smooth animation (better than SCNAction for this case)
         SCNTransaction.begin()
@@ -526,6 +558,9 @@ struct TransparentSceneView: UIViewRepresentable {
         @State private var gyroEnabled: Bool = false
         @State private var gyroSensitivityX: CGFloat = 50
         @State private var gyroSensitivityY: CGFloat = 50
+        @State private var cameraRotationX: CGFloat = 0  // Pitch
+        @State private var cameraRotationY: CGFloat = 0  // Yaw  
+        @State private var cameraRotationZ: CGFloat = 0  // Roll
         
         var body: some View {
             VStack {
@@ -548,7 +583,10 @@ struct TransparentSceneView: UIViewRepresentable {
                         velocityY: velocityY,
                         allowsCameraControl: allowsCameraControl,
                         gyroSensitivityX: gyroEnabled ? gyroSensitivityX : nil,
-                        gyroSensitivityY: gyroEnabled ? gyroSensitivityY : nil
+                        gyroSensitivityY: gyroEnabled ? gyroSensitivityY : nil,
+                        cameraRotationX: cameraRotationX != 0 ? cameraRotationX : nil,
+                        cameraRotationY: cameraRotationY != 0 ? cameraRotationY : nil,
+                        cameraRotationZ: cameraRotationZ != 0 ? cameraRotationZ : nil
                     )
                 }
                 
@@ -617,6 +655,24 @@ struct TransparentSceneView: UIViewRepresentable {
                         HStack {
                             Text("Gyro Y Sensitivity: \(Int(gyroSensitivityY))")
                             Slider(value: $gyroSensitivityY, in: 0...200, step: 5)
+                        }
+                    }
+                    
+                    // Manual Camera Rotation Controls
+                    Group {
+                        HStack {
+                            Text("Camera Pitch (X): \(Int(cameraRotationX))°")
+                            Slider(value: $cameraRotationX, in: -90...90, step: 1)
+                        }
+                        
+                        HStack {
+                            Text("Camera Yaw (Y): \(Int(cameraRotationY))°")
+                            Slider(value: $cameraRotationY, in: -180...180, step: 1)
+                        }
+                        
+                        HStack {
+                            Text("Camera Roll (Z): \(Int(cameraRotationZ))°")
+                            Slider(value: $cameraRotationZ, in: -180...180, step: 1)
                         }
                     }
                 }
