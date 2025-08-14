@@ -366,7 +366,7 @@ struct TransparentSceneView: UIViewRepresentable {
         // Calculate rotation values from gyro
         var gyroRotationX: Float = 0
         var gyroRotationY: Float = 0
-        var gyroRotationZ: Float = 0
+        let gyroRotationZ: Float = 0
         
         if let sensX = gyroSensitivityX, gyro.isActive {
             // Original: gyro.normalizedRotation.roll * 35 * gyroSensitivity (degrees)
