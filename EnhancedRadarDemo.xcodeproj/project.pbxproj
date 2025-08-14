@@ -34,6 +34,7 @@
 			children = (
 				8E062C762E4A6E6E00DBE0F0 /* EnhancedRadarDemo */,
 				8E062C752E4A6E6E00DBE0F0 /* Products */,
+				8EF366BC2E4D9CF6003C1616 /* Drafts */,
 			);
 			sourceTree = "<group>";
 		};
@@ -43,6 +44,13 @@
 				8E062C742E4A6E6E00DBE0F0 /* EnhancedRadarDemo.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8EF366BC2E4D9CF6003C1616 /* Drafts */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Drafts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
