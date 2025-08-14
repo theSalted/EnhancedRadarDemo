@@ -110,7 +110,10 @@ class GyroService: ObservableObject {
             }
         }
         
-        isActive = true
+        // Update isActive on main queue to avoid publishing during view updates
+        DispatchQueue.main.async {
+            self.isActive = true
+        }
         logger.info("Gyro started successfully")
     }
     
@@ -119,12 +122,16 @@ class GyroService: ObservableObject {
         guard isActive else { return }
         
         motionManager.stopDeviceMotionUpdates()
-        isActive = false
         
-        // Reset to neutral position
-        withAnimation(.easeOut(duration: 0.3)) {
-            normalizedRotation = NormalizedRotation()
-            attitude = nil
+        // Update published properties on main queue to avoid publishing during view updates
+        DispatchQueue.main.async {
+            self.isActive = false
+            
+            // Reset to neutral position
+            withAnimation(.easeOut(duration: 0.3)) {
+                self.normalizedRotation = NormalizedRotation()
+                self.attitude = nil
+            }
         }
     }
     

@@ -66,15 +66,16 @@ struct RadioSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                BackgroundGridPattern(
-                    spacing: 50,
+                InfiniteGridView(
+                    spacing: 10,
                     majorEvery: 1,
-                    velocity: CGSize(width: -100, height: -50),
-                    enable3D: true,
-                    useGyro: true,
-                    gyroSensitivity: 1.5,
-                    perspectiveDepth: 600,
-                    disablePan: true
+                    color: .secondary.opacity(0.5),
+                    majorColor: .secondary.opacity(0.25),
+                    lineWidth: 0.1,
+                    majorLineWidth: 0.1,
+                    velocityX: 20,
+                    velocityY: -10,
+                    allowsCameraControl: false
                 )
                 .ignoresSafeArea()
                 .mask {

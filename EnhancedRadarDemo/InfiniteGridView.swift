@@ -225,6 +225,9 @@ struct TransparentSceneView: UIViewRepresentable {
         // Update gyro lifecycle based on sensitivity settings
         updateGyroLifecycle()
         
+        // Update camera gyro tilt
+        updateCameraGyroTilt(scene: scene)
+        
         // Update animation (velocity changes)
         updateGridAnimation(gridNode: gridNode, scene: scene)
     }
@@ -242,19 +245,47 @@ struct TransparentSceneView: UIViewRepresentable {
         }
     }
     
+    private func updateCameraGyroTilt(scene: SCNScene) {
+        guard let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) else { return }
+        
+        // Calculate rotation values matching the original apply3DEffect function
+        var rotationX: Float = 0
+        var rotationY: Float = 0
+        
+        if let sensX = gyroSensitivityX, gyro.isActive {
+            // Original: gyro.normalizedRotation.roll * 35 * gyroSensitivity (degrees)
+            // normalizedRotation.roll is already -1 to 1, multiply by sensitivity and convert to radians
+            let degrees = gyro.normalizedRotation.roll * sensX
+            rotationY = Float(degrees * .pi / 180.0)  // Convert degrees to radians for SceneKit
+        }
+        
+        if let sensY = gyroSensitivityY, gyro.isActive {
+            // Pitch rotation (forward/back tilt)
+            let degrees = -gyro.normalizedRotation.pitch * sensY  // Negative for natural feel
+            rotationX = Float(degrees * .pi / 180.0)
+        }
+        
+        // Apply rotation directly with smooth animation
+        let currentRotation = cameraNode.eulerAngles
+        let targetRotation = SCNVector3(rotationX, rotationY, currentRotation.z)
+        
+        // Use SCNTransaction for smooth animation (better than SCNAction for this case)
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.1  // Shorter duration for responsiveness
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
+        cameraNode.eulerAngles = targetRotation
+        SCNTransaction.commit()
+    }
+    
     private func updateGridAnimation(gridNode: SCNNode, scene: SCNScene) {
         gridNode.removeAllActions()
         
-        // Also stop any camera animations that might conflict with user camera controls
-        if let cameraNode = scene.rootNode.childNodes.first(where: { $0.camera != nil }) {
-            cameraNode.removeAllActions()
-        }
+        // Handle camera gyro tilt (removing actions would conflict with gyro tilt)
         
-        // Check if we have any movement (velocity or gyro)
+        // Check if we have velocity movement for the grid
         let hasVelocity = velocityX != 0 || velocityY != 0
-        let hasGyro = (gyroSensitivityX != nil || gyroSensitivityY != nil) && gyro.isActive
         
-        if hasVelocity || hasGyro {
+        if hasVelocity {
             let step = Float(spacing) * 0.1  // Grid spacing in SceneKit units
             
             // Animate the grid with smart wrapping that preserves major line pattern
@@ -265,20 +296,9 @@ struct TransparentSceneView: UIViewRepresentable {
                 let baseFrameMoveX = Float(self.velocityX) * 0.1 * 0.016
                 let baseFrameMoveY = Float(self.velocityY) * 0.1 * 0.016
                 
-                // Add gyro influence if enabled
-                var gyroOffsetX: Float = 0
-                var gyroOffsetY: Float = 0
-                
-                if let sensX = self.gyroSensitivityX {
-                    gyroOffsetX = Float(self.gyro.normalizedRotation.roll * sensX) * 0.1 * 0.016
-                }
-                if let sensY = self.gyroSensitivityY {
-                    gyroOffsetY = Float(-self.gyro.normalizedRotation.pitch * sensY) * 0.1 * 0.016  // Negative for natural feel
-                }
-                
-                // Combine velocity and gyro movement
-                let totalFrameMoveX = baseFrameMoveX + gyroOffsetX
-                let totalFrameMoveY = baseFrameMoveY + gyroOffsetY
+                // Combine velocity movement (gyro affects camera, not grid)
+                let totalFrameMoveX = baseFrameMoveX
+                let totalFrameMoveY = baseFrameMoveY
                 
                 // Apply movement
                 let newX = currentPos.x + totalFrameMoveX

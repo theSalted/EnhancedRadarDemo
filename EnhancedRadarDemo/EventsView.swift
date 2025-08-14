@@ -27,14 +27,15 @@ struct EventsView: View {
                     showRadioView = true
                 } label: {
                     ZStack {
-                        
-                        BackgroundGridPattern(
-                            spacing: 50,
+                        InfiniteGridView(
+                            spacing: 17,
                             majorEvery: 1,
-                            enable3D: true,
-                            useGyro: true,
-                            gyroSensitivity: 1.5,
-                            perspectiveDepth: 600
+                            color: .secondary.opacity(0.5),
+                            majorColor: .secondary.opacity(0.25),
+                            lineWidth: 0.1,
+                            majorLineWidth: 0.1,
+                            allowsCameraControl: false,
+                            gyroSensitivityX: 15,
                         )
                         .opacity(1 - scrollProperties.featureTriggerProgress)
                         .mask {

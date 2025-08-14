@@ -28,13 +28,15 @@ struct AirportsView: View {
                     showAirportDetailView = true
                 } label: {
                     ZStack {
-                        BackgroundGridPattern(
-                            spacing: 50,
+                        InfiniteGridView(
+                            spacing: 20,
                             majorEvery: 1,
-                            enable3D: true,
-                            useGyro: true,
-                            gyroSensitivity: 1.0,
-                            perspectiveDepth: 600
+                            color: .secondary.opacity(0.5),
+                            majorColor: .secondary.opacity(0.25),
+                            lineWidth: 0.1,
+                            majorLineWidth: 0.1,
+                            allowsCameraControl: false,
+                            gyroSensitivityX: 15,
                         )
                         .mask {
                             GeometryReader { proxy in
