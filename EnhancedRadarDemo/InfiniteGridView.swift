@@ -8,7 +8,7 @@
 import SwiftUI
 import SceneKit
 
-struct InfiniteGridView: View {
+struct InfiniteGridView: View, Equatable {
     // Grid properties
     var spacing: CGFloat = 16
     var majorEvery: Int = 4
@@ -214,7 +214,9 @@ struct TransparentSceneView: UIViewRepresentable {
     @State private var previousSpacing: CGFloat = 0
     @State private var previousMajorEvery: Int = 0
     
+    
     func makeUIView(context: Context) -> SCNView {
+        let coordinator = context.coordinator
         let scnView = SCNView()
         scnView.allowsCameraControl = allowsCameraControl  // Use the parameter
         scnView.backgroundColor = UIColor.clear
@@ -259,12 +261,35 @@ struct TransparentSceneView: UIViewRepresentable {
             self.previousMajorEvery = majorEvery
         }
         
-        // Start gyro if any sensitivity is set
+        // Start gyro if any sensitivity is set (but don't double-start in updateUIView)
         if gyroSensitivityX != nil || gyroSensitivityY != nil {
             gyro.requestStart()
+            coordinator.didStartGyro = true
         }
         
         return scnView
+    }
+    
+    class Coordinator {
+        var didStartGyro: Bool = false
+        
+        deinit {
+            // Critical: Stop gyro when coordinator is deallocated
+            if didStartGyro && GyroService.shared.isActive {
+                GyroService.shared.requestStop()
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator()
+    }
+    
+    static func dismantleUIView(_ uiView: SCNView, coordinator: Coordinator) {
+        // Cleanup when view is destroyed - this is critical for preventing gyro leaks
+        if coordinator.didStartGyro {
+            GyroService.shared.requestStop()
+        }
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
@@ -324,16 +349,14 @@ struct TransparentSceneView: UIViewRepresentable {
     }
     
     private func updateGyroLifecycle() {
-        // Start gyro if any sensitivity is set, stop if both are nil
-        if gyroSensitivityX != nil || gyroSensitivityY != nil {
-            if !gyro.isActive {
-                gyro.requestStart()
-            }
-        } else {
+        // Only stop gyro if both sensitivities are nil and it's currently active
+        // Don't start here - that's handled in makeUIView to avoid double-starting
+        if gyroSensitivityX == nil && gyroSensitivityY == nil {
             if gyro.isActive {
                 gyro.requestStop()
             }
         }
+        // Note: Starting is only handled in makeUIView to prevent multiple start calls
     }
     
     private func updateCameraGyroTilt(scene: SCNScene) {
@@ -780,4 +803,27 @@ struct TransparentSceneView: UIViewRepresentable {
     }
     
     return GridPreview()
+}
+
+// MARK: - Equatable Implementation
+extension InfiniteGridView {
+    static func == (lhs: InfiniteGridView, rhs: InfiniteGridView) -> Bool {
+        // Compare all parameters that affect the grid rendering
+        return lhs.spacing == rhs.spacing &&
+               lhs.majorEvery == rhs.majorEvery &&
+               lhs.color == rhs.color &&
+               lhs.majorColor == rhs.majorColor &&
+               lhs.lineWidth == rhs.lineWidth &&
+               lhs.majorLineWidth == rhs.majorLineWidth &&
+               lhs.velocityX == rhs.velocityX &&
+               lhs.velocityY == rhs.velocityY &&
+               lhs.allowsCameraControl == rhs.allowsCameraControl &&
+               lhs.gyroSensitivityX == rhs.gyroSensitivityX &&
+               lhs.gyroSensitivityY == rhs.gyroSensitivityY &&
+               lhs.cameraRotationX == rhs.cameraRotationX &&
+               lhs.cameraRotationY == rhs.cameraRotationY &&
+               lhs.cameraRotationZ == rhs.cameraRotationZ &&
+               lhs.manualRotationAnimationDuration == rhs.manualRotationAnimationDuration &&
+               lhs.animateSpacingChanges == rhs.animateSpacingChanges
+    }
 }

@@ -76,6 +76,11 @@ struct RadioSheetView: View {
     @State private var planeScale: CGFloat = 1.0
     @State private var isTransitioning: Bool = false
     
+    // Cached values to prevent constant InfiniteGridView recreation
+    @State private var cachedVelocityX: CGFloat = 20
+    @State private var cachedVelocityY: CGFloat = -10
+    @State private var cachedFlightState: AviationGridView.FlightState = .flight
+    
     // All possible plane combinations (2 airlines × 3 states = 6 permutations)
     private let planeCombos: [Plane] = [
         Plane(imageName: "DeltaPlane", state: .takeoff, offset: 0),
@@ -219,14 +224,21 @@ struct RadioSheetView: View {
                     majorColor: .white.opacity(0.25),
                     lineWidth: 0.01,
                     majorLineWidth: 0.1,
-                    velocityX: currentPlane.state.velocity().width,
-                    velocityY: currentPlane.state.velocity().height,
+                    velocityX: cachedVelocityX,
+                    velocityY: cachedVelocityY,
                     allowsCameraControl: false,
-                    flightState: .constant(currentPlane.state.gridFlightState()),
+                    flightState: $cachedFlightState,
                     animationDuration: 0.6
                 )
                 .offset(y: -400)
                 .ignoresSafeArea()
+                .onChange(of: currentPlane.state) { oldState, newState in
+                    // Update cached values only when plane state actually changes
+                    let newVelocity = newState.velocity()
+                    cachedVelocityX = newVelocity.width
+                    cachedVelocityY = newVelocity.height
+                    cachedFlightState = newState.gridFlightState()
+                }
                 .mask {
                     GeometryReader { proxy in
                         Rectangle().fill(
@@ -314,6 +326,12 @@ struct RadioSheetView: View {
                             )
                         }
                         .onAppear {
+                            // Initialize cached values with current plane state
+                            let initialVelocity = currentPlane.state.velocity()
+                            cachedVelocityX = initialVelocity.width
+                            cachedVelocityY = initialVelocity.height
+                            cachedFlightState = currentPlane.state.gridFlightState()
+                            
                             // Show an initial line immediately so the UI never appears empty
                             // Begin the randomized 3–5s feed loop
                             scheduleNextFeed()

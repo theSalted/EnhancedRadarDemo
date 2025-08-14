@@ -10,7 +10,7 @@ import SwiftUI
 /// Aviation-specific grid view that represents aircraft perspective
 /// - Taxi state: 90° pitch (looking down the runway)
 /// - Flight state: 0° pitch (level flight perspective)
-struct AviationGridView: View {
+struct AviationGridView: View, Equatable {
     // Grid properties (passed through to InfiniteGridView)
     var spacing: CGFloat = 16
     var majorEvery: Int = 4
@@ -89,6 +89,25 @@ struct AviationGridView: View {
                 currentPitch = newState.targetPitch
             }
         }
+    }
+    
+    // MARK: - Equatable Implementation
+    static func == (lhs: AviationGridView, rhs: AviationGridView) -> Bool {
+        // Only compare the values that actually matter for performance
+        // Exclude @State variables and focus on view-defining parameters
+        return lhs.spacing == rhs.spacing &&
+               lhs.majorEvery == rhs.majorEvery &&
+               lhs.color == rhs.color &&
+               lhs.majorColor == rhs.majorColor &&
+               lhs.lineWidth == rhs.lineWidth &&
+               lhs.majorLineWidth == rhs.majorLineWidth &&
+               lhs.velocityX == rhs.velocityX &&
+               lhs.velocityY == rhs.velocityY &&
+               lhs.allowsCameraControl == rhs.allowsCameraControl &&
+               lhs.gyroSensitivityX == rhs.gyroSensitivityX &&
+               lhs.gyroSensitivityY == rhs.gyroSensitivityY &&
+        lhs.$flightState.wrappedValue == rhs.$flightState.wrappedValue &&
+               lhs.animationDuration == rhs.animationDuration
     }
 }
 
