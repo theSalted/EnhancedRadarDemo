@@ -36,9 +36,22 @@ struct Plane {
                     .taxing
             }
         }
+        
+        func velocity() -> CGSize {
+            switch self {
+            case .takeoff:
+                return CGSize(width: 20, height: -10)  // Moving right and up (departing)
+            case .landing:
+                return CGSize(width: 20, height: 10)  // Moving left and down (arriving)
+            case .taxing:
+                return CGSize(width: 15, height: 0)     // Slow movement on ground
+                
+            }
+        }
     }
-    
     let imageName: String
+    let state: State
+    let offset: CGFloat
 }
 
 struct RadioSheetView: View {
@@ -51,8 +64,27 @@ struct RadioSheetView: View {
     @State private var feedIndex: Int = 0
     @State private var feedTimer: Timer? = nil
     
-    // Aviation flight state
-    @State private var flightState: AviationGridView.FlightState = .flight
+    // Timer for automatic plane switching
+    @State private var planeTimer: Timer? = nil
+    
+    // Current plane being tracked by ATC
+    @State private var currentPlane: Plane = Plane(imageName: "DeltaPlane", state: .takeoff, offset: 0)
+    
+    // Animation states for plane transitions
+    @State private var planeOffset: CGSize = .zero
+    @State private var planeOpacity: Double = 1.0
+    @State private var planeScale: CGFloat = 1.0
+    @State private var isTransitioning: Bool = false
+    
+    // All possible plane combinations (2 airlines × 3 states = 6 permutations)
+    private let planeCombos: [Plane] = [
+        Plane(imageName: "DeltaPlane", state: .takeoff, offset: 0),
+        Plane(imageName: "DeltaPlane", state: .landing, offset: 0),
+        Plane(imageName: "DeltaPlane", state: .taxing, offset: 60),
+        Plane(imageName: "UnitedPlane", state: .takeoff, offset: -60),
+        Plane(imageName: "UnitedPlane", state: .landing, offset: -60),
+        Plane(imageName: "UnitedPlane", state: .taxing, offset: -40)
+    ]
     
     struct TranscriptLine: Identifiable {
         let id = UUID()
@@ -75,6 +107,71 @@ struct RadioSheetView: View {
         TranscriptLine(speaker: "Departure", text: "Roger. Expect ILS runway two two left.")
     ]
 
+    // Switch to a random different plane with smooth animations
+    private func switchToNewPlane() {
+        guard !isTransitioning else { return }
+        
+        // Pick a random plane different from current
+        let availablePlanes = planeCombos.filter { $0.imageName != currentPlane.imageName || $0.state != currentPlane.state }
+        guard let newPlane = availablePlanes.randomElement() else { return }
+        
+        isTransitioning = true
+        
+        // Calculate realistic departure position based on current plane's operation
+        let departureHeight: CGFloat = {
+            switch currentPlane.state {
+            case .takeoff:
+                return -100  // Fly out high (climbing after takeoff)
+            case .landing:
+                return 0     // Fly out at center level
+            case .taxing:
+                return 100   // Fly out low (ground level)
+            }
+        }()
+        
+        // Calculate realistic arrival position based on new plane's operation
+        let arrivalHeight: CGFloat = {
+            switch newPlane.state {
+            case .takeoff:
+                return 100   // Arrive low (preparing for takeoff from ground)
+            case .landing:
+                return -100  // Arrive high (on approach from altitude)
+            case .taxing:
+                return 0     // Arrive at center level (taxiing)
+            }
+        }()
+        
+        // Phase 1: Current plane flies out to left edge (departing)
+        withAnimation(.easeIn(duration: 0.3)) {
+            planeOffset = CGSize(width: -400, height: departureHeight)
+            planeOpacity = 0.15  // Fade to partial opacity for depth perception
+            planeScale = 0.3  // Scale down as it flies away
+        }
+        
+        // Phase 2: After current plane flies out, update plane and grid, then fly new plane in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Update to new plane (happens while invisible)
+            currentPlane = newPlane
+            
+            // Position new plane at right edge, ready to fly in
+            planeOffset = CGSize(width: 400, height: arrivalHeight)
+            planeOpacity = 0.25  // Start with partial opacity for depth perception
+            planeScale = 0.3  // Start small (far away)
+            
+            // Phase 3: New plane flies in right to left (arriving)
+            withAnimation(.easeOut(duration: 0.3)) {
+                planeOffset = .zero  // Fly to center position
+                planeOpacity = 1.0
+                planeScale = 1.0  // Scale up to full size as it approaches
+            }
+            
+            // Mark transition complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isTransitioning = false
+            }
+        }
+    }
+    
     // Schedule the next pseudo-live line at a random 3–5s delay and loop forever.
     private func scheduleNextFeed() {
         feedTimer?.invalidate()
@@ -99,6 +196,19 @@ struct RadioSheetView: View {
         }
     }
     
+    // Schedule automatic plane switching at random 2-5 second intervals
+    private func scheduleNextPlaneSwitch() {
+        planeTimer?.invalidate()
+        let delay = Double.random(in: 2.0...5.0)
+        planeTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
+            DispatchQueue.main.async {
+                switchToNewPlane()
+                // Chain the next plane switch
+                scheduleNextPlaneSwitch()
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -106,14 +216,14 @@ struct RadioSheetView: View {
                     spacing: 10,
                     majorEvery: 1,
                     color: .white.opacity(1),
-                    majorColor: .white.opacity(0.5),
+                    majorColor: .white.opacity(0.25),
                     lineWidth: 0.01,
                     majorLineWidth: 0.1,
-                    velocityX: 20,
-                    velocityY: -10,
+                    velocityX: currentPlane.state.velocity().width,
+                    velocityY: currentPlane.state.velocity().height,
                     allowsCameraControl: false,
-                    flightState: $flightState,
-                    animationDuration: 0.3
+                    flightState: .constant(currentPlane.state.gridFlightState()),
+                    animationDuration: 0.6
                 )
                 .offset(y: -400)
                 .ignoresSafeArea()
@@ -147,10 +257,12 @@ struct RadioSheetView: View {
                 
                 VStack {
                     Spacer()
-                    Image("DeltaPlane")
+                    Image(currentPlane.imageName)
                         .resizable()
-                        .rotationEffect(.degrees(0))
-                        .offset(y: 40)
+                        .rotationEffect(.degrees(currentPlane.state.tiltAngle()))
+                        .scaleEffect(planeScale)
+                        .offset(x: planeOffset.width, y: currentPlane.offset + planeOffset.height)
+                        .opacity(planeOpacity)
                         .scaledToFit()
                         .padding()
 //                    Spacer()
@@ -205,9 +317,12 @@ struct RadioSheetView: View {
                             // Show an initial line immediately so the UI never appears empty
                             // Begin the randomized 3–5s feed loop
                             scheduleNextFeed()
+                            // Begin automatic plane switching
+                            scheduleNextPlaneSwitch()
                         }
                         .onDisappear {
                             feedTimer?.invalidate()
+                            planeTimer?.invalidate()
                         }
                         
                         
@@ -309,20 +424,6 @@ struct RadioSheetView: View {
             }
             .ignoresSafeArea()
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        HapticService.shared.light()
-                        flightState = flightState == .flight ? .taxing : .flight
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: flightState == .flight ? "airplane" : "car")
-                            Text(flightState.description)
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.blue)
-                    }
-                }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         HapticService.shared.medium()

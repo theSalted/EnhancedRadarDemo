@@ -251,11 +251,13 @@ struct TransparentSceneView: UIViewRepresentable {
         }
         
         // Initialize previous values
-        previousRotationX = cameraRotationX
-        previousRotationY = cameraRotationY
-        previousRotationZ = cameraRotationZ
-        previousSpacing = spacing
-        previousMajorEvery = majorEvery
+        DispatchQueue.main.async {
+            self.previousRotationX = cameraRotationX
+            self.previousRotationY = cameraRotationY
+            self.previousRotationZ = cameraRotationZ
+            self.previousSpacing = spacing
+            self.previousMajorEvery = majorEvery
+        }
         
         // Start gyro if any sensitivity is set
         if gyroSensitivityX != nil || gyroSensitivityY != nil {
@@ -288,8 +290,10 @@ struct TransparentSceneView: UIViewRepresentable {
                 // Immediate update for non-animated changes
                 updateGridGeometry(gridNode: gridNode)
             }
-            previousSpacing = spacing
-            previousMajorEvery = majorEvery
+            DispatchQueue.main.async {
+                self.previousSpacing = spacing
+                self.previousMajorEvery = majorEvery
+            }
         }
         
         // Update materials/colors (these are lightweight updates)
@@ -308,9 +312,11 @@ struct TransparentSceneView: UIViewRepresentable {
             updateCameraGyroTilt(scene: scene)
             
             // Update previous values
-            previousRotationX = cameraRotationX
-            previousRotationY = cameraRotationY
-            previousRotationZ = cameraRotationZ
+            DispatchQueue.main.async {
+                self.previousRotationX = cameraRotationX
+                self.previousRotationY = cameraRotationY
+                self.previousRotationZ = cameraRotationZ
+            }
         }
         
         // Update animation (velocity changes)
