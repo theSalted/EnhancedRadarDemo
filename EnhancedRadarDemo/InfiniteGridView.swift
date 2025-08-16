@@ -39,6 +39,49 @@ struct InfiniteGridView: View, Equatable {
     // Animation-friendly spacing updates
     var animateSpacingChanges: Bool = false
     
+    init(
+        spacing: CGFloat = 16,
+        majorEvery: Int = 4,
+        color: Color = .secondary.opacity(1),
+        majorColor: Color = .secondary.opacity(1),
+        lineWidth: CGFloat = 0.5,
+        majorLineWidth: CGFloat = 1,
+        velocityX: CGFloat = 0,
+        velocityY: CGFloat = 0,
+        allowsCameraControl: Bool = false,
+        gyroSensitivityX: CGFloat? = nil,
+        gyroSensitivityY: CGFloat? = nil,
+        cameraRotationX: CGFloat? = nil,
+        cameraRotationY: CGFloat? = nil,
+        cameraRotationZ: CGFloat? = nil,
+        manualRotationAnimationDuration: Double = 2.0,
+        animateSpacingChanges: Bool = false
+    ) {
+        let hasVelocity = velocityX != 0 || velocityY != 0
+        let hasGyro = gyroSensitivityX != nil || gyroSensitivityY != nil
+        
+        self.spacing = spacing
+        self.majorEvery = majorEvery
+        self.color = color
+        self.majorColor = majorColor
+        self.lineWidth = lineWidth
+        self.majorLineWidth = majorLineWidth
+        self.velocityX = velocityX
+        self.velocityY = velocityY
+        self.allowsCameraControl = allowsCameraControl
+        self.gyroSensitivityX = hasVelocity ? nil : gyroSensitivityX
+        self.gyroSensitivityY = hasVelocity ? nil : gyroSensitivityY
+        self.cameraRotationX = cameraRotationX
+        self.cameraRotationY = cameraRotationY
+        self.cameraRotationZ = cameraRotationZ
+        self.manualRotationAnimationDuration = manualRotationAnimationDuration
+        self.animateSpacingChanges = animateSpacingChanges
+        
+        if hasVelocity && hasGyro {
+            print("Warning: Gyro disabled because velocity is active. Gyro and velocity are mutually exclusive.")
+        }
+    }
+    
     var body: some View {
         TransparentSceneView(
             spacing: spacing,
@@ -261,8 +304,9 @@ struct TransparentSceneView: UIViewRepresentable {
             self.previousMajorEvery = majorEvery
         }
         
-        // Start gyro if any sensitivity is set (but don't double-start in updateUIView)
-        if gyroSensitivityX != nil || gyroSensitivityY != nil {
+        // Start gyro if any sensitivity is set AND no velocity is active (but don't double-start in updateUIView)
+        let hasVelocity = velocityX != 0 || velocityY != 0
+        if (gyroSensitivityX != nil || gyroSensitivityY != nil) && !hasVelocity {
             gyro.requestStart()
             coordinator.didStartGyro = true
         }
@@ -349,9 +393,10 @@ struct TransparentSceneView: UIViewRepresentable {
     }
     
     private func updateGyroLifecycle() {
-        // Only stop gyro if both sensitivities are nil and it's currently active
-        // Don't start here - that's handled in makeUIView to avoid double-starting
-        if gyroSensitivityX == nil && gyroSensitivityY == nil {
+        let hasVelocity = velocityX != 0 || velocityY != 0
+        
+        // Stop gyro if both sensitivities are nil OR if velocity is active
+        if (gyroSensitivityX == nil && gyroSensitivityY == nil) || hasVelocity {
             if gyro.isActive {
                 gyro.requestStop()
             }
